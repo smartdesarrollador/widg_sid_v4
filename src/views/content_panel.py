@@ -11,6 +11,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from models.category import Category
 from models.item import Item
 from views.widgets.item_widget import ItemButton
+from views.widgets.search_bar import SearchBar
+from core.search_engine import SearchEngine
 
 
 class ContentPanel(QWidget):
@@ -25,6 +27,8 @@ class ContentPanel(QWidget):
         self.is_expanded = False
         self.target_width = 300
         self.collapsed_width = 0
+        self.search_engine = SearchEngine()
+        self.all_items = []  # Store all items before filtering
 
         self.init_ui()
 
@@ -61,6 +65,11 @@ class ContentPanel(QWidget):
         """)
         self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(self.header_label)
+
+        # Search bar
+        self.search_bar = SearchBar()
+        self.search_bar.search_changed.connect(self.on_search_changed)
+        main_layout.addWidget(self.search_bar)
 
         # Scroll area for items
         scroll_area = QScrollArea()
@@ -105,22 +114,34 @@ class ContentPanel(QWidget):
     def load_category(self, category: Category):
         """Load and display items from a category"""
         self.current_category = category
+        self.all_items = category.items.copy()
 
         # Update header
         self.header_label.setText(category.name)
+
+        # Clear search bar
+        self.search_bar.clear_search()
 
         # Clear existing items
         self.clear_items()
 
         # Add new items
-        for item in category.items:
-            item_button = ItemButton(item)
-            item_button.item_clicked.connect(self.on_item_clicked)
-            self.items_layout.insertWidget(self.items_layout.count() - 1, item_button)
+        self.display_items(self.all_items)
 
         # Expand panel if not already expanded
         if not self.is_expanded:
             self.expand()
+
+    def display_items(self, items):
+        """Display a list of items"""
+        # Clear existing items
+        self.clear_items()
+
+        # Add items
+        for item in items:
+            item_button = ItemButton(item)
+            item_button.item_clicked.connect(self.on_item_clicked)
+            self.items_layout.insertWidget(self.items_layout.count() - 1, item_button)
 
     def clear_items(self):
         """Clear all item buttons"""
@@ -160,3 +181,16 @@ class ContentPanel(QWidget):
         """Handle item click"""
         # Emit signal to parent
         self.item_clicked.emit(item)
+
+    def on_search_changed(self, query: str):
+        """Handle search query change with filtering"""
+        if not self.current_category:
+            return
+
+        if not query or not query.strip():
+            # Show all items if query is empty
+            self.display_items(self.all_items)
+        else:
+            # Filter items using search engine
+            filtered_items = self.search_engine.search_in_category(query, self.current_category)
+            self.display_items(filtered_items)

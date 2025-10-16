@@ -1,7 +1,7 @@
 """
 Main Window View
 """
-from PyQt6.QtWidgets import QMainWindow, QWidget, QHBoxLayout
+from PyQt6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QMessageBox
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal
 from PyQt6.QtGui import QScreen
 import sys
@@ -11,6 +11,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from views.sidebar import Sidebar
 from views.content_panel import ContentPanel
 from models.item import Item
+from core.hotkey_manager import HotkeyManager
+from core.tray_manager import TrayManager
 
 
 class MainWindow(QMainWindow):
@@ -25,9 +27,14 @@ class MainWindow(QMainWindow):
         self.controller = controller
         self.sidebar = None
         self.content_panel = None
+        self.hotkey_manager = None
+        self.tray_manager = None
+        self.is_visible = True
 
         self.init_ui()
         self.position_window()
+        self.setup_hotkeys()
+        self.setup_tray()
 
     def init_ui(self):
         """Initialize the user interface"""
@@ -125,3 +132,97 @@ class MainWindow(QMainWindow):
         if event.buttons() == Qt.MouseButton.LeftButton:
             self.move(event.globalPosition().toPoint() - self.drag_position)
             event.accept()
+
+    def setup_hotkeys(self):
+        """Setup global hotkeys"""
+        self.hotkey_manager = HotkeyManager()
+
+        # Register Ctrl+Shift+V to toggle window visibility
+        self.hotkey_manager.register_hotkey("ctrl+shift+v", self.toggle_visibility)
+
+        # Start listening for hotkeys
+        self.hotkey_manager.start()
+
+        print("Hotkeys registered: Ctrl+Shift+V (toggle window)")
+
+    def setup_tray(self):
+        """Setup system tray icon"""
+        self.tray_manager = TrayManager()
+
+        # Connect tray signals
+        self.tray_manager.show_window_requested.connect(self.show_window)
+        self.tray_manager.hide_window_requested.connect(self.hide_window)
+        self.tray_manager.settings_requested.connect(self.show_settings)
+        self.tray_manager.quit_requested.connect(self.quit_application)
+
+        # Setup tray icon
+        self.tray_manager.setup_tray(self)
+
+        print("System tray icon created")
+
+    def toggle_visibility(self):
+        """Toggle window visibility"""
+        if self.is_visible:
+            self.hide_window()
+        else:
+            self.show_window()
+
+    def show_window(self):
+        """Show the window"""
+        self.show()
+        self.activateWindow()
+        self.raise_()
+        self.is_visible = True
+        if self.tray_manager:
+            self.tray_manager.update_window_state(True)
+        print("Window shown")
+
+    def hide_window(self):
+        """Hide the window"""
+        self.hide()
+        self.is_visible = False
+        if self.tray_manager:
+            self.tray_manager.update_window_state(False)
+        print("Window hidden")
+
+    def show_settings(self):
+        """Show settings dialog"""
+        # TODO: Implement settings dialog
+        if self.tray_manager:
+            self.tray_manager.show_message(
+                "Configuración",
+                "La configuración estará disponible próximamente"
+            )
+        print("Settings requested (not implemented yet)")
+
+    def quit_application(self):
+        """Quit the application"""
+        print("Quitting application...")
+
+        # Stop hotkey manager
+        if self.hotkey_manager:
+            self.hotkey_manager.stop()
+
+        # Cleanup tray
+        if self.tray_manager:
+            self.tray_manager.cleanup()
+
+        # Close window
+        self.close()
+
+        # Exit application
+        from PyQt6.QtWidgets import QApplication
+        QApplication.quit()
+
+    def closeEvent(self, event):
+        """Override close event to minimize to tray instead of closing"""
+        # Minimize to tray instead of closing
+        event.ignore()
+        self.hide_window()
+
+        # Show notification on first minimize
+        if self.tray_manager and self.is_visible:
+            self.tray_manager.show_message(
+                "Widget Sidebar",
+                "La aplicación sigue ejecutándose en la bandeja del sistema"
+            )
