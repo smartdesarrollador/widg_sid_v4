@@ -5,7 +5,7 @@ Widget for editing categories and their items
 
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QListWidget, QListWidgetItem,
-    QPushButton, QLabel, QMessageBox, QInputDialog
+    QPushButton, QLabel, QMessageBox, QInputDialog, QDialog
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont

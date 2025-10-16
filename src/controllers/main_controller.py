@@ -18,7 +18,7 @@ class MainController:
 
     def __init__(self):
         # Initialize managers
-        self.config_manager = ConfigManager()
+        self.config_manager = ConfigManager(db_path="widget_sidebar.db")
         self.clipboard_manager = ClipboardManager()
 
         # Initialize controllers
@@ -79,3 +79,8 @@ class MainController:
     def set_setting(self, key: str, value) -> bool:
         """Set a configuration setting"""
         return self.config_manager.set_setting(key, value)
+
+    def __del__(self):
+        """Cleanup: close database connection"""
+        if hasattr(self, 'config_manager'):
+            self.config_manager.close()

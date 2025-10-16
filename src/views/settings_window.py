@@ -10,6 +10,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 import sys
+import logging
+import traceback
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -17,6 +19,9 @@ from views.category_editor import CategoryEditor
 from views.appearance_settings import AppearanceSettings
 from views.hotkey_settings import HotkeySettings
 from views.general_settings import GeneralSettings
+
+# Get logger
+logger = logging.getLogger(__name__)
 
 
 class SettingsWindow(QDialog):
@@ -187,14 +192,30 @@ class SettingsWindow(QDialog):
     def save_settings(self):
         """Save all settings and close dialog"""
         try:
+            logger.info("=== SAVE_SETTINGS CALLED ===")
+            logger.info("Attempting to save settings...")
+
             if self.save_to_config():
+                logger.info("Settings saved successfully")
                 self.settings_changed.emit()
+                logger.info("Settings changed signal emitted")
                 self.accept()
+                logger.info("Dialog accepted")
+            else:
+                logger.error("save_to_config returned False")
+                QMessageBox.warning(
+                    self,
+                    "Advertencia",
+                    "No se pudieron guardar algunos ajustes"
+                )
+
         except Exception as e:
+            logger.critical(f"CRITICAL ERROR in save_settings: {e}", exc_info=True)
+
             QMessageBox.critical(
                 self,
                 "Error",
-                f"Error al guardar configuración:\n{str(e)}"
+                f"Se produjo un error al guardar:\n{str(e)}\n\nRevisa widget_sidebar_error.log para más detalles."
             )
 
     def save_to_config(self) -> bool:
@@ -204,39 +225,73 @@ class SettingsWindow(QDialog):
         Returns:
             True if successful
         """
-        if not self.config_manager:
-            return False
+        try:
+            logger.info("=== SAVE_TO_CONFIG CALLED ===")
 
-        # Get settings from all tabs
-        appearance_settings = self.appearance_settings.get_settings()
-        hotkey_settings = self.hotkey_settings.get_settings()
-        general_settings = self.general_settings.get_settings()
+            if not self.config_manager:
+                logger.error("No config_manager available")
+                return False
 
-        # Update config
-        self.config_manager.set_setting("theme", appearance_settings["theme"])
-        self.config_manager.set_setting("opacity", appearance_settings["opacity"])
-        self.config_manager.set_setting("sidebar_width", appearance_settings["sidebar_width"])
-        self.config_manager.set_setting("panel_width", appearance_settings["panel_width"])
-        self.config_manager.set_setting("animation_speed", appearance_settings["animation_speed"])
+            # Get settings from all tabs
+            logger.info("Getting settings from tabs...")
+            appearance_settings = self.appearance_settings.get_settings()
+            logger.debug(f"Appearance settings: {appearance_settings}")
 
-        self.config_manager.set_setting("hotkey", hotkey_settings["hotkey"])
+            hotkey_settings = self.hotkey_settings.get_settings()
+            logger.debug(f"Hotkey settings: {hotkey_settings}")
 
-        self.config_manager.set_setting("minimize_to_tray", general_settings["minimize_to_tray"])
-        self.config_manager.set_setting("always_on_top", general_settings["always_on_top"])
-        self.config_manager.set_setting("start_with_windows", general_settings["start_with_windows"])
-        self.config_manager.set_setting("max_history", general_settings["max_history"])
+            general_settings = self.general_settings.get_settings()
+            logger.debug(f"General settings: {general_settings}")
 
-        # Save categories
-        categories = self.category_editor.get_categories()
-        if self.controller:
-            # Update controller's categories
-            self.controller.categories = categories
+            # Update config
+            logger.info("Updating config settings...")
+            self.config_manager.set_setting("theme", appearance_settings["theme"])
+            self.config_manager.set_setting("opacity", appearance_settings["opacity"])
+            self.config_manager.set_setting("sidebar_width", appearance_settings["sidebar_width"])
+            self.config_manager.set_setting("panel_width", appearance_settings["panel_width"])
+            self.config_manager.set_setting("animation_speed", appearance_settings["animation_speed"])
+            logger.debug("Appearance settings saved")
 
-            # Save to config
-            self.config_manager.categories = categories
-            self.config_manager.save_config()
+            self.config_manager.set_setting("hotkey", hotkey_settings["hotkey"])
+            logger.debug("Hotkey settings saved")
 
-        return True
+            self.config_manager.set_setting("minimize_to_tray", general_settings["minimize_to_tray"])
+            self.config_manager.set_setting("always_on_top", general_settings["always_on_top"])
+            self.config_manager.set_setting("start_with_windows", general_settings["start_with_windows"])
+            self.config_manager.set_setting("max_history", general_settings["max_history"])
+            logger.debug("General settings saved")
+
+            # Save categories
+            logger.info("Saving categories...")
+            categories = self.category_editor.get_categories()
+            logger.info(f"Got {len(categories)} categories from editor")
+
+            if self.controller:
+                # Update controller's categories
+                logger.debug("Updating controller categories...")
+                self.controller.categories = categories
+
+                # Save each category to database through config_manager
+                logger.info("Saving categories to database...")
+                for i, category in enumerate(categories):
+                    logger.debug(f"Processing category {i+1}/{len(categories)}: {category.name} (ID: {category.id})")
+
+                    # Check if category exists (has numeric ID)
+                    if category.id.isdigit():
+                        logger.debug(f"Updating existing category {category.id}")
+                        self.config_manager.update_category(category.id, category)
+                    else:
+                        logger.debug(f"Adding new category with ID {category.id}")
+                        self.config_manager.add_category(category)
+
+                logger.info(f"Categories saved successfully: {len(categories)} categories")
+
+            logger.info("=== SAVE_TO_CONFIG COMPLETED SUCCESSFULLY ===")
+            return True
+
+        except Exception as e:
+            logger.critical(f"CRITICAL ERROR in save_to_config: {e}", exc_info=True)
+            raise
 
     def closeEvent(self, event):
         """Override close event to check for unsaved changes"""

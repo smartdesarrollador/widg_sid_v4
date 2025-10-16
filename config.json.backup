@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "settings": {
+    "theme": "dark",
+    "panel_width": 300,
+    "sidebar_width": 70,
+    "hotkey": "ctrl+shift+v",
+    "window_position": {
+      "x": null,
+      "y": null
+    },
+    "always_on_top": true,
+    "start_with_windows": false,
+    "animation_speed": 300,
+    "opacity": 0.95,
+    "test_key": "test_value"
+  },
+  "categories": [],
+  "history": []
+}

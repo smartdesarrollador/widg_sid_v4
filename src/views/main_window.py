@@ -5,6 +5,8 @@ from PyQt6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QMessageBox
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal
 from PyQt6.QtGui import QScreen
 import sys
+import logging
+import traceback
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -14,6 +16,9 @@ from views.settings_window import SettingsWindow
 from models.item import Item
 from core.hotkey_manager import HotkeyManager
 from core.tray_manager import TrayManager
+
+# Get logger
+logger = logging.getLogger(__name__)
 
 
 class MainWindow(QMainWindow):
@@ -83,31 +88,58 @@ class MainWindow(QMainWindow):
 
     def on_category_clicked(self, category_id: str):
         """Handle category button click"""
-        print(f"Category clicked: {category_id}")
+        try:
+            logger.info(f"Category clicked: {category_id}")
 
-        # Get category from controller
-        if self.controller:
-            category = self.controller.get_category(category_id)
-            if category:
-                # Load category into content panel
-                self.content_panel.load_category(category)
+            # Get category from controller
+            if self.controller:
+                logger.debug(f"Getting category {category_id} from controller...")
+                category = self.controller.get_category(category_id)
 
-                # Adjust window width for expanded panel
-                self.setFixedWidth(370)  # 70px sidebar + 300px panel
+                if category:
+                    logger.info(f"Category found: {category.name} with {len(category.items)} items")
+                    # Load category into content panel
+                    self.content_panel.load_category(category)
 
-        # Emit signal
-        self.category_selected.emit(category_id)
+                    # Adjust window width for expanded panel
+                    self.setFixedWidth(370)  # 70px sidebar + 300px panel
+                    logger.debug("Window width adjusted to 370px")
+                else:
+                    logger.warning(f"Category {category_id} not found")
+
+            # Emit signal
+            self.category_selected.emit(category_id)
+            logger.debug("Category selected signal emitted")
+
+        except Exception as e:
+            logger.error(f"Error in on_category_clicked: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al cargar categoría:\n{str(e)}\n\nRevisa widget_sidebar_error.log"
+            )
 
     def on_item_clicked(self, item: Item):
         """Handle item button click"""
-        print(f"Item clicked: {item.label}")
+        try:
+            logger.info(f"Item clicked: {item.label}")
 
-        # Copy to clipboard via controller
-        if self.controller:
-            self.controller.copy_item_to_clipboard(item)
+            # Copy to clipboard via controller
+            if self.controller:
+                logger.debug(f"Copying item to clipboard: {item.content[:50]}...")
+                self.controller.copy_item_to_clipboard(item)
+                logger.info("Item copied to clipboard successfully")
 
-        # Emit signal
-        self.item_selected.emit(item)
+            # Emit signal
+            self.item_selected.emit(item)
+
+        except Exception as e:
+            logger.error(f"Error in on_item_clicked: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al copiar item:\n{str(e)}\n\nRevisa widget_sidebar_error.log"
+            )
 
     def position_window(self):
         """Position window on the right edge of the screen"""
