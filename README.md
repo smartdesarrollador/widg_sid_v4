@@ -1,12 +1,12 @@
 # Widget Sidebar - Windows Clipboard Manager
 
-**Version:** 2.0.0
+**Version:** 3.0.0
 **Framework:** PyQt6
 **Architecture:** MVC (Model-View-Controller)
 
 ## Descripción
 
-Widget de barra lateral para Windows que funciona como gestor avanzado de portapapeles con navegación jerárquica, categorías predefinidas de comandos útiles, hotkeys globales y system tray integration.
+Widget de barra lateral completamente configurable para Windows. Funciona como gestor avanzado de portapapeles con navegación jerárquica, categorías personalizables, hotkeys globales, system tray integration y editor completo de configuración.
 
 ## Características
 
@@ -23,6 +23,15 @@ Widget de barra lateral para Windows que funciona como gestor avanzado de portap
 - ✅ **SearchBar**: Búsqueda en tiempo real con debouncing (300ms)
 - ✅ **Search Engine**: Filtrado inteligente case-insensitive
 - ✅ **Minimize to Tray**: Cerrar ventana minimiza a tray (no cierra app)
+
+### Configuration Features (Phase 5)
+- ✅ **Settings Window**: Ventana de configuración completa con 4 tabs
+- ✅ **Category Editor**: Crear, editar y eliminar categorías e items
+- ✅ **Item Editor**: Editor de items con validación (Label, Type, Content, Tags)
+- ✅ **Appearance Settings**: Tema, opacidad, dimensiones, velocidad animación
+- ✅ **Hotkey Settings**: Visualización y configuración de atajos (próximamente editable)
+- ✅ **General Settings**: Comportamiento, historial, export/import configuración
+- ✅ **Export/Import**: Guardar y restaurar configuración completa en JSON
 
 ## Instalación (Desarrollo)
 
@@ -44,7 +53,7 @@ pip install -r requirements.txt
 python main.py
 
 # Ejecutar tests
-python test_phase4.py
+python test_phase5.py
 ```
 
 ### Interacción
@@ -56,6 +65,16 @@ python test_phase4.py
 4. Click en item para copiar al portapapeles
 5. Item flashea azul confirmando copia
 
+**Configuración:**
+1. Click en botón ⚙ (parte inferior del sidebar)
+2. Se abre ventana de configuración con 4 tabs:
+   - **Categorías**: Crear/editar categorías e items
+   - **Apariencia**: Tema, opacidad, dimensiones
+   - **Hotkeys**: Ver y configurar atajos
+   - **General**: Comportamiento, export/import
+3. Hacer cambios deseados
+4. Click "Guardar" o "Aplicar"
+
 **Hotkeys:**
 - `Ctrl+Shift+V`: Toggle ventana (funciona globalmente)
 
@@ -63,7 +82,7 @@ python test_phase4.py
 - Click izquierdo: Toggle ventana
 - Click derecho: Menú contextual
   - Mostrar/Ocultar
-  - Configuración (próximamente)
+  - Configuración
   - Salir
 
 **Cerrar ventana:**
@@ -79,12 +98,13 @@ python test_phase4.py
 
 ## Estado del Proyecto
 
-**Fase actual:** FASE 4 - Hotkeys, Tray & Search ✅ COMPLETADA
+**Fase actual:** FASE 5 - Settings & Configuration ✅ COMPLETADA
 
 - **Fase 1**: ✅ Setup y Configuración
 - **Fase 2**: ✅ Core MVC
 - **Fase 3**: ✅ UI Completa y Funcional
-- **Fase 4**: ✅ Hotkeys, System Tray, Search (PRODUCTION READY 🚀)
+- **Fase 4**: ✅ Hotkeys, System Tray, Search
+- **Fase 5**: ✅ Settings Window & Configuration (FULLY CONFIGURABLE 🎛️)
 
 ## Estructura del Proyecto
 

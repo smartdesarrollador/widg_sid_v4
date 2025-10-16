@@ -1,7 +1,7 @@
 """
 Sidebar View - Vertical sidebar with category buttons
 """
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from typing import List
@@ -18,6 +18,9 @@ class Sidebar(QWidget):
 
     # Signal emitted when a category button is clicked
     category_clicked = pyqtSignal(str)  # category_id
+
+    # Signal emitted when settings button is clicked
+    settings_clicked = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -69,6 +72,31 @@ class Sidebar(QWidget):
         # Add stretch to push buttons to top
         main_layout.addStretch()
 
+        # Settings button at the bottom
+        self.settings_button = QPushButton("⚙")
+        self.settings_button.setFixedSize(70, 60)
+        self.settings_button.setToolTip("Configuración")
+        self.settings_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.settings_button.setStyleSheet("""
+            QPushButton {
+                background-color: #252525;
+                color: #cccccc;
+                border: none;
+                border-top: 1px solid #1e1e1e;
+                font-size: 20pt;
+            }
+            QPushButton:hover {
+                background-color: #3d3d3d;
+                color: #007acc;
+            }
+            QPushButton:pressed {
+                background-color: #007acc;
+                color: #ffffff;
+            }
+        """)
+        self.settings_button.clicked.connect(self.on_settings_clicked)
+        main_layout.addWidget(self.settings_button)
+
     def load_categories(self, categories: List[Category]):
         """Load and create buttons for categories"""
         # Clear existing buttons
@@ -115,3 +143,7 @@ class Sidebar(QWidget):
         if button:
             button.set_active(True)
             self.active_button = button
+
+    def on_settings_clicked(self):
+        """Handle settings button click"""
+        self.settings_clicked.emit()

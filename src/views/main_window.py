@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from views.sidebar import Sidebar
 from views.content_panel import ContentPanel
+from views.settings_window import SettingsWindow
 from models.item import Item
 from core.hotkey_manager import HotkeyManager
 from core.tray_manager import TrayManager
@@ -25,6 +26,7 @@ class MainWindow(QMainWindow):
     def __init__(self, controller=None):
         super().__init__()
         self.controller = controller
+        self.config_manager = controller.config_manager if controller else None
         self.sidebar = None
         self.content_panel = None
         self.hotkey_manager = None
@@ -66,6 +68,7 @@ class MainWindow(QMainWindow):
         # Create sidebar
         self.sidebar = Sidebar()
         self.sidebar.category_clicked.connect(self.on_category_clicked)
+        self.sidebar.settings_clicked.connect(self.open_settings)
         main_layout.addWidget(self.sidebar)
 
         # Create content panel (initially collapsed)
@@ -185,15 +188,34 @@ class MainWindow(QMainWindow):
             self.tray_manager.update_window_state(False)
         print("Window hidden")
 
+    def open_settings(self):
+        """Open settings window"""
+        print("Opening settings window...")
+        settings_window = SettingsWindow(controller=self.controller, parent=self)
+        settings_window.settings_changed.connect(self.on_settings_changed)
+
+        if settings_window.exec() == QMessageBox.DialogCode.Accepted:
+            print("Settings saved")
+
     def show_settings(self):
-        """Show settings dialog"""
-        # TODO: Implement settings dialog
-        if self.tray_manager:
-            self.tray_manager.show_message(
-                "Configuración",
-                "La configuración estará disponible próximamente"
-            )
-        print("Settings requested (not implemented yet)")
+        """Show settings dialog (called from tray)"""
+        self.open_settings()
+
+    def on_settings_changed(self):
+        """Handle settings changes"""
+        print("Settings changed - reloading...")
+
+        # Reload categories in sidebar
+        if self.controller:
+            categories = self.controller.get_categories()
+            self.sidebar.load_categories(categories)
+
+        # Apply appearance settings (opacity, etc.)
+        if self.config_manager:
+            opacity = self.config_manager.get_setting("opacity", 0.95)
+            self.setWindowOpacity(opacity)
+
+        print("Settings applied")
 
     def quit_application(self):
         """Quit the application"""
