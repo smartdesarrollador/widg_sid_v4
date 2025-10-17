@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QScrollArea, QLabel
 from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, pyqtSignal
 from PyQt6.QtGui import QFont
 import sys
+import logging
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -14,12 +15,17 @@ from views.widgets.item_widget import ItemButton
 from views.widgets.search_bar import SearchBar
 from core.search_engine import SearchEngine
 
+# Get logger
+logger = logging.getLogger(__name__)
+
 
 class ContentPanel(QWidget):
     """Expandable content panel displaying category items"""
 
     # Signal emitted when an item is clicked
     item_clicked = pyqtSignal(object)
+    # Signal emitted when panel width changes
+    width_changed = pyqtSignal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -110,38 +116,51 @@ class ContentPanel(QWidget):
         self.animation = QPropertyAnimation(self, b"maximumWidth")
         self.animation.setDuration(250)
         self.animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        self.animation.valueChanged.connect(lambda: self.width_changed.emit(self.width()))
 
     def load_category(self, category: Category):
         """Load and display items from a category"""
+        logger.info(f"Loading category: {category.name} with {len(category.items)} items")
+
         self.current_category = category
         self.all_items = category.items.copy()
 
         # Update header
         self.header_label.setText(category.name)
+        logger.debug(f"Header updated to: {category.name}")
 
         # Clear search bar
         self.search_bar.clear_search()
 
         # Clear existing items
         self.clear_items()
+        logger.debug("Previous items cleared")
 
         # Add new items
         self.display_items(self.all_items)
 
         # Expand panel if not already expanded
         if not self.is_expanded:
+            logger.info("Expanding panel...")
             self.expand()
+        else:
+            logger.debug("Panel already expanded")
 
     def display_items(self, items):
         """Display a list of items"""
+        logger.info(f"Displaying {len(items)} items")
+
         # Clear existing items
         self.clear_items()
 
         # Add items
-        for item in items:
+        for idx, item in enumerate(items):
+            logger.debug(f"Creating button {idx+1}/{len(items)}: {item.label}")
             item_button = ItemButton(item)
             item_button.item_clicked.connect(self.on_item_clicked)
             self.items_layout.insertWidget(self.items_layout.count() - 1, item_button)
+
+        logger.info(f"Successfully added {len(items)} item buttons to layout")
 
     def clear_items(self):
         """Clear all item buttons"""
@@ -155,10 +174,12 @@ class ContentPanel(QWidget):
         if self.is_expanded:
             return
 
+        logger.debug(f"Starting expansion animation from {self.width()}px to {self.target_width}px")
         self.is_expanded = True
         self.animation.setStartValue(self.width())
         self.animation.setEndValue(self.target_width)
         self.animation.start()
+        logger.info("Panel expansion started")
 
     def collapse(self):
         """Collapse the panel with animation"""

@@ -79,6 +79,7 @@ class MainWindow(QMainWindow):
         # Create content panel (initially collapsed)
         self.content_panel = ContentPanel()
         self.content_panel.item_clicked.connect(self.on_item_clicked)
+        self.content_panel.width_changed.connect(self.on_panel_width_changed)
         main_layout.addWidget(self.content_panel)
 
     def load_categories(self, categories):
@@ -101,9 +102,8 @@ class MainWindow(QMainWindow):
                     # Load category into content panel
                     self.content_panel.load_category(category)
 
-                    # Adjust window width for expanded panel
-                    self.setFixedWidth(370)  # 70px sidebar + 300px panel
-                    logger.debug("Window width adjusted to 370px")
+                    # Note: No setFixedWidth here - let ContentPanel handle its own expansion
+                    logger.debug("Category loaded into content panel")
                 else:
                     logger.warning(f"Category {category_id} not found")
 
@@ -118,6 +118,13 @@ class MainWindow(QMainWindow):
                 "Error",
                 f"Error al cargar categoría:\n{str(e)}\n\nRevisa widget_sidebar_error.log"
             )
+
+    def on_panel_width_changed(self, panel_width: int):
+        """Handle content panel width change"""
+        # Adjust window width: sidebar (70px) + panel width
+        new_width = 70 + panel_width
+        self.setFixedWidth(new_width)
+        logger.debug(f"Window width adjusted to {new_width}px (sidebar: 70px + panel: {panel_width}px)")
 
     def on_item_clicked(self, item: Item):
         """Handle item button click"""
