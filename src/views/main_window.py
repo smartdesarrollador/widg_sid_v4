@@ -1,7 +1,7 @@
 """
 Main Window View
 """
-from PyQt6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QMessageBox
+from PyQt6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QMessageBox
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal
 from PyQt6.QtGui import QScreen
 import sys
@@ -74,10 +74,69 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
-        # Main layout
-        main_layout = QHBoxLayout(central_widget)
+        # Main layout (vertical: title bar + sidebar)
+        main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
+
+        # Title bar with minimize and close buttons
+        title_bar = QWidget()
+        title_bar.setFixedHeight(30)
+        title_bar.setStyleSheet("""
+            QWidget {
+                background-color: #1e1e1e;
+                border-bottom: 1px solid #007acc;
+            }
+        """)
+        title_bar_layout = QHBoxLayout(title_bar)
+        title_bar_layout.setContentsMargins(5, 0, 5, 0)
+        title_bar_layout.setSpacing(5)
+
+        # Spacer
+        title_bar_layout.addStretch()
+
+        # Minimize button
+        self.minimize_button = QPushButton("─")
+        self.minimize_button.setFixedSize(25, 25)
+        self.minimize_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2d2d2d;
+                color: #cccccc;
+                border: 1px solid #3d3d3d;
+                border-radius: 3px;
+                font-size: 14pt;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #3d3d3d;
+                border: 1px solid #007acc;
+            }
+        """)
+        self.minimize_button.clicked.connect(self.minimize_window)
+        title_bar_layout.addWidget(self.minimize_button)
+
+        # Close button
+        self.close_button = QPushButton("✕")
+        self.close_button.setFixedSize(25, 25)
+        self.close_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2d2d2d;
+                color: #cccccc;
+                border: 1px solid #3d3d3d;
+                border-radius: 3px;
+                font-size: 12pt;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #c42b1c;
+                border: 1px solid #e81123;
+                color: #ffffff;
+            }
+        """)
+        self.close_button.clicked.connect(self.close_window)
+        title_bar_layout.addWidget(self.close_button)
+
+        main_layout.addWidget(title_bar)
 
         # Create sidebar only (no embedded panel)
         self.sidebar = Sidebar()
@@ -238,10 +297,16 @@ class MainWindow(QMainWindow):
         self.show()
         self.activateWindow()
         self.raise_()
-        self.is_visible = True
-        if self.tray_manager:
-            self.tray_manager.update_window_state(True)
-        print("Window shown")
+
+    def minimize_window(self):
+        """Minimize the window"""
+        logger.info("Minimizing window")
+        self.hide_window()
+
+    def close_window(self):
+        """Close the application"""
+        logger.info("Closing application from close button")
+        self.quit_application()
 
     def hide_window(self):
         """Hide the window"""
