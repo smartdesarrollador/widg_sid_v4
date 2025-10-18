@@ -48,6 +48,7 @@ desktop.ini
 config.json
 *.log
 *.bak
+*.db
 
 # PyInstaller
 *.manifest
