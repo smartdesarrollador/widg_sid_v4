@@ -53,10 +53,19 @@ class FloatingPanel(QWidget):
             Qt.WindowType.FramelessWindowHint
         )
 
+        # Calculate window height: 80% of screen height (same as sidebar)
+        from PyQt6.QtWidgets import QApplication
+        screen = QApplication.primaryScreen()
+        if screen:
+            screen_height = screen.availableGeometry().height()
+            window_height = int(screen_height * 0.8)
+        else:
+            window_height = 600  # Fallback
+
         # Set window size
         self.setFixedWidth(self.panel_width)
         self.setMinimumHeight(400)
-        self.resize(self.panel_width, 600)
+        self.resize(self.panel_width, window_height)
 
         # Set window opacity
         self.setWindowOpacity(0.95)

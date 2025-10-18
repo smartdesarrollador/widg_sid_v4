@@ -54,10 +54,18 @@ class MainWindow(QMainWindow):
             Qt.WindowType.Tool
         )
 
+        # Calculate window height: 80% of screen height (10% margin top + 10% margin bottom)
+        screen = self.screen()
+        if screen:
+            screen_height = screen.availableGeometry().height()
+            window_height = int(screen_height * 0.8)  # 80% de la altura de la pantalla
+        else:
+            window_height = 600  # Fallback
+
         # Set window size (starts with sidebar only)
         self.setFixedWidth(70)  # Just sidebar initially
         self.setMinimumHeight(400)
-        self.resize(70, 600)
+        self.resize(70, window_height)
 
         # Set window opacity
         self.setWindowOpacity(0.95)
