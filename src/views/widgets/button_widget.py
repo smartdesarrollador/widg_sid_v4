@@ -22,8 +22,8 @@ class CategoryButton(QPushButton):
         # Set button text
         self.setText(self.category_name)
 
-        # Set fixed size
-        self.setFixedSize(70, 70)
+        # Set fixed size - Altura reducida para visualizar más categorías
+        self.setFixedSize(70, 45)
 
         # Set font
         font = QFont()
@@ -80,4 +80,4 @@ class CategoryButton(QPushButton):
 
     def sizeHint(self) -> QSize:
         """Recommended size"""
-        return QSize(70, 70)
+        return QSize(70, 45)

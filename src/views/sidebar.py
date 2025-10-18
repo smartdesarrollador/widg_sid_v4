@@ -178,7 +178,7 @@ class Sidebar(QWidget):
         """Scroll the category list up"""
         scrollbar = self.scroll_area.verticalScrollBar()
         current_value = scrollbar.value()
-        new_value = max(0, current_value - 70)  # Scroll by button height
+        new_value = max(0, current_value - 50)  # Scroll by button height (45px + spacing)
 
         # Animate scroll
         self.animate_scroll(current_value, new_value)
@@ -187,7 +187,7 @@ class Sidebar(QWidget):
         """Scroll the category list down"""
         scrollbar = self.scroll_area.verticalScrollBar()
         current_value = scrollbar.value()
-        new_value = min(scrollbar.maximum(), current_value + 70)  # Scroll by button height
+        new_value = min(scrollbar.maximum(), current_value + 50)  # Scroll by button height (45px + spacing)
 
         # Animate scroll
         self.animate_scroll(current_value, new_value)
