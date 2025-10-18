@@ -1,7 +1,7 @@
 """
 Item Button Widget
 """
-from PyQt6.QtWidgets import QPushButton, QWidget, QHBoxLayout, QLabel
+from PyQt6.QtWidgets import QPushButton, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QFrame
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QTimer
 from PyQt6.QtGui import QFont
 import sys
@@ -11,8 +11,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from models.item import Item
 
 
-class ItemButton(QPushButton):
-    """Custom item button widget for content panel"""
+class ItemButton(QFrame):
+    """Custom item button widget for content panel with tags support"""
 
     # Signal emitted when item is clicked with the item
     item_clicked = pyqtSignal(object)
@@ -26,42 +26,67 @@ class ItemButton(QPushButton):
 
     def init_ui(self):
         """Initialize button UI"""
-        # Set button text
-        self.setText(self.item.label)
-
-        # Set minimum height
-        self.setMinimumHeight(40)
-        self.setMaximumHeight(50)
-
-        # Set font
-        font = QFont()
-        font.setPointSize(10)
-        self.setFont(font)
-
-        # Enable cursor change on hover
+        # Set frame properties
+        self.setMinimumHeight(50)
+        self.setMaximumHeight(80)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        # Set alignment
+        # Main layout
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(15, 8, 15, 8)
+        main_layout.setSpacing(5)
+
+        # Item label
+        self.label_widget = QLabel(self.item.label)
+        label_font = QFont()
+        label_font.setPointSize(10)
+        self.label_widget.setFont(label_font)
+        main_layout.addWidget(self.label_widget)
+
+        # Tags container (only if item has tags)
+        if self.item.tags and len(self.item.tags) > 0:
+            tags_layout = QHBoxLayout()
+            tags_layout.setContentsMargins(0, 0, 0, 0)
+            tags_layout.setSpacing(5)
+
+            for tag in self.item.tags:
+                tag_label = QLabel(tag)
+                tag_label.setStyleSheet("""
+                    QLabel {
+                        background-color: #007acc;
+                        color: #ffffff;
+                        border-radius: 3px;
+                        padding: 2px 8px;
+                        font-size: 8pt;
+                    }
+                """)
+                tags_layout.addWidget(tag_label)
+
+            tags_layout.addStretch()
+            main_layout.addLayout(tags_layout)
+
+        # Set initial style
         self.setStyleSheet("""
-            QPushButton {
+            QFrame {
                 background-color: #2d2d2d;
-                color: #cccccc;
                 border: none;
                 border-bottom: 1px solid #1e1e1e;
-                padding: 10px 15px;
-                text-align: left;
             }
-            QPushButton:hover {
+            QFrame:hover {
                 background-color: #3d3d3d;
-                color: #ffffff;
             }
-            QPushButton:pressed {
-                background-color: #454545;
+            QLabel {
+                color: #cccccc;
+                background-color: transparent;
+                border: none;
             }
         """)
 
-        # Connect click event
-        self.clicked.connect(self.on_clicked)
+    def mousePressEvent(self, event):
+        """Handle mouse press event"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.on_clicked()
+        super().mousePressEvent(event)
 
     def on_clicked(self):
         """Handle button click"""
@@ -77,13 +102,15 @@ class ItemButton(QPushButton):
 
         # Change style temporarily
         self.setStyleSheet("""
-            QPushButton {
+            QFrame {
                 background-color: #007acc;
-                color: #ffffff;
                 border: none;
                 border-bottom: 1px solid #005a9e;
-                padding: 10px 15px;
-                text-align: left;
+            }
+            QLabel {
+                color: #ffffff;
+                background-color: transparent;
+                border: none;
                 font-weight: bold;
             }
         """)
@@ -95,19 +122,17 @@ class ItemButton(QPushButton):
         """Reset button style to normal"""
         self.is_copied = False
         self.setStyleSheet("""
-            QPushButton {
+            QFrame {
                 background-color: #2d2d2d;
-                color: #cccccc;
                 border: none;
                 border-bottom: 1px solid #1e1e1e;
-                padding: 10px 15px;
-                text-align: left;
             }
-            QPushButton:hover {
+            QFrame:hover {
                 background-color: #3d3d3d;
-                color: #ffffff;
             }
-            QPushButton:pressed {
-                background-color: #454545;
+            QLabel {
+                color: #cccccc;
+                background-color: transparent;
+                border: none;
             }
         """)

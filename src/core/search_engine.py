@@ -42,11 +42,19 @@ class SearchEngine:
                 continue
 
             for item in category.items:
-                # Search in both label and content
+                # Search in label, content, and tags
                 label_match = query in item.label.lower()
                 content_match = query in item.content.lower()
 
-                if label_match or content_match:
+                # Search in tags
+                tags_match = False
+                if item.tags:
+                    for tag in item.tags:
+                        if query in tag.lower():
+                            tags_match = True
+                            break
+
+                if label_match or content_match or tags_match:
                     matching_items.append(item)
 
         return matching_items
@@ -69,10 +77,19 @@ class SearchEngine:
         matching_items = []
 
         for item in category.items:
+            # Search in label, content, and tags
             label_match = query in item.label.lower()
             content_match = query in item.content.lower()
 
-            if label_match or content_match:
+            # Search in tags
+            tags_match = False
+            if item.tags:
+                for tag in item.tags:
+                    if query in tag.lower():
+                        tags_match = True
+                        break
+
+            if label_match or content_match or tags_match:
                 matching_items.append(item)
 
         return matching_items
