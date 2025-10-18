@@ -34,6 +34,7 @@ class MainWindow(QMainWindow):
         self.config_manager = controller.config_manager if controller else None
         self.sidebar = None
         self.floating_panel = None  # Ventana flotante para items
+        self.current_category_id = None  # Para el toggle
         self.hotkey_manager = None
         self.tray_manager = None
         self.is_visible = True
@@ -82,9 +83,16 @@ class MainWindow(QMainWindow):
             self.sidebar.load_categories(categories)
 
     def on_category_clicked(self, category_id: str):
-        """Handle category button click - opens floating panel"""
+        """Handle category button click - toggle floating panel"""
         try:
             logger.info(f"Category clicked: {category_id}")
+
+            # Toggle: Si se hace clic en la misma categoría, ocultar el panel
+            if self.current_category_id == category_id and self.floating_panel and self.floating_panel.isVisible():
+                logger.info(f"Toggling off - hiding floating panel for category: {category_id}")
+                self.floating_panel.hide()
+                self.current_category_id = None
+                return
 
             # Get category from controller
             if self.controller:
@@ -107,6 +115,9 @@ class MainWindow(QMainWindow):
                     # Position near sidebar
                     self.floating_panel.position_near_sidebar(self)
 
+                    # Update current category
+                    self.current_category_id = category_id
+
                     logger.debug("Category loaded into floating panel")
                 else:
                     logger.warning(f"Category {category_id} not found")
@@ -126,6 +137,7 @@ class MainWindow(QMainWindow):
     def on_floating_panel_closed(self):
         """Handle floating panel closed"""
         logger.info("Floating panel closed")
+        self.current_category_id = None  # Reset para el toggle
         if self.floating_panel:
             self.floating_panel.deleteLater()
             self.floating_panel = None
