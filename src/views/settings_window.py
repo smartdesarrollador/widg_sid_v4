@@ -271,18 +271,53 @@ class SettingsWindow(QDialog):
                 logger.debug("Updating controller categories...")
                 self.controller.categories = categories
 
+                # Get existing categories from database to avoid duplicates
+                existing_categories = self.config_manager.get_categories()
+                existing_ids = {cat.id: cat for cat in existing_categories}
+                existing_names = {cat.name: cat for cat in existing_categories}
+
+                # Track which categories are in the editor (to detect deletions)
+                current_category_ids = set()
+                current_category_names = set()
+
                 # Save each category to database through config_manager
                 logger.info("Saving categories to database...")
                 for i, category in enumerate(categories):
-                    logger.debug(f"Processing category {i+1}/{len(categories)}: {category.name} (ID: {category.id})")
+                    logger.info(f"Processing category {i+1}/{len(categories)}: '{category.name}' (ID: '{category.id}')")
+                    logger.debug(f"  - ID is digit: {category.id.isdigit()}")
+                    logger.debug(f"  - ID in existing_ids: {category.id in existing_ids}")
+                    logger.debug(f"  - Name in existing_names: {category.name in existing_names}")
 
-                    # Check if category exists (has numeric ID)
+                    # Track this category
+                    current_category_names.add(category.name)
                     if category.id.isdigit():
-                        logger.debug(f"Updating existing category {category.id}")
-                        self.config_manager.update_category(category.id, category)
+                        current_category_ids.add(category.id)
+
+                    # Check if category exists by ID (numeric) or by name
+                    if category.id.isdigit() and category.id in existing_ids:
+                        logger.info(f"→ Updating existing category by ID: {category.id}")
+                        result = self.config_manager.update_category(category.id, category)
+                        logger.info(f"  Update result: {result}")
+                    elif category.name in existing_names:
+                        # Category exists with this name - update it
+                        existing_cat = existing_names[category.name]
+                        logger.info(f"→ Updating existing category by name: '{category.name}' (ID: {existing_cat.id})")
+                        result = self.config_manager.update_category(existing_cat.id, category)
+                        logger.info(f"  Update result: {result}")
+                        # Track the actual ID from database
+                        current_category_ids.add(existing_cat.id)
                     else:
-                        logger.debug(f"Adding new category with ID {category.id}")
-                        self.config_manager.add_category(category)
+                        logger.info(f"→ Adding NEW category: '{category.name}' (ID: '{category.id}')")
+                        result = self.config_manager.add_category(category)
+                        logger.info(f"  Add result: {result}")
+
+                # Delete categories that were removed from the editor
+                logger.info("Checking for deleted categories...")
+                for existing_cat in existing_categories:
+                    if existing_cat.id not in current_category_ids and existing_cat.name not in current_category_names:
+                        logger.info(f"→ Deleting removed category: '{existing_cat.name}' (ID: {existing_cat.id})")
+                        result = self.config_manager.delete_category(existing_cat.id)
+                        logger.info(f"  Delete result: {result}")
 
                 logger.info(f"Categories saved successfully: {len(categories)} categories")
 

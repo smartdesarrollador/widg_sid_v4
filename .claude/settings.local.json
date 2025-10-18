@@ -14,7 +14,8 @@
       "Bash(rm -rf build)",
       "Bash(rm README.md USER_GUIDE.md widget_sidebar.db)",
       "Bash(rm nul)",
-      "Bash(python main.py)"
+      "Bash(python main.py)",
+      "Bash(python remove_duplicates.py)"
     ],
     "deny": [],
     "ask": []
