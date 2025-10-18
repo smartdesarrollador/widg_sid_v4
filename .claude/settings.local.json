@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree /F /A)",
+      "Bash(rmdir \"src/controllers/srccontrollers\")",
+      "Bash(rmdir \"src/core/srccore\")",
+      "Bash(rmdir \"src/models/srcmodels\")",
+      "Bash(rmdir \"src/utils/srcutils\")",
+      "Bash(rmdir \"src/views/widgets/srcviewswidgets\")",
+      "Bash(rm PHASE2_SUMMARY.md PHASE3_SUMMARY.md PHASE4_SUMMARY.md PHASE5_SUMMARY.md MIGRACION_SQLITE_RESUMEN.md VERIFICACION_FINAL.md COMPILACION_COMPLETADA.md CORRECCIONES_APLICADAS.md LOGGING_HABILITADO.md CORRECCION_FINAL.md \"CORRECCION_PANEL_v2.0.3.md\" COMO_USAR.md GETTING_STARTED.md)",
+      "Bash(rm test_phase2.py test_phase3.py test_phase4.py test_phase5.py test_main_controller.py test_db_integration.py test_complete_system.py test_can_run.py)",
+      "Bash(rm config.json.backup default_categories.json.backup)",
+      "Bash(rm WidgetSidebar.spec run_migration.py)",
+      "Bash(rm -rf build)",
+      "Bash(rm README.md USER_GUIDE.md widget_sidebar.db)",
+      "Bash(rm nul)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

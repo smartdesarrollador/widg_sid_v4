@@ -1,0 +1,73 @@
+@startuml
+!theme vibrant
+
+title Diagrama de Clases Principal - Widget Sidebar
+
+package "View" {
+  class MainWindow {
+    - controller: MainController
+    + init_ui()
+    + on_category_clicked()
+    + on_item_clicked()
+  }
+}
+
+package "Controller" {
+  class MainController {
+    - db_manager: DBManager
+    - categories: List<Category>
+    + load_data()
+    + copy_item_to_clipboard()
+  }
+}
+
+package "Data Access Layer" {
+  class DBManager {
+    - connection: sqlite3.Connection
+    + get_categories(): List<Dict>
+    + add_item(): int
+    + get_item(): Dict
+  }
+}
+
+package "Model" {
+  class Category {
+    + name: str
+    + items: List<Item>
+  }
+
+  class Item {
+    + label: str
+    + content: str
+  }
+}
+
+' --- Relationships ---
+MainWindow -right-> MainController : <<uses>>
+MainController -down-> DBManager : <<uses>>
+MainController .up.> MainWindow : <<updates>>
+
+MainController ..> Category : <<creates>>
+MainController ..> Item : <<creates>>
+
+Category "1" o-- "*" Item : <<contains>>
+
+' --- Notes ---
+note right of MainWindow
+  La Vista (UI) que el usuario ve.
+  Notifica eventos al Controlador.
+end note
+
+note left of MainController
+  Orquesta la aplicación.
+  Recibe eventos de la Vista.
+  Pide datos al DBManager.
+  Crea los objetos del Modelo.
+end note
+
+note right of DBManager
+  Abstrae el acceso a la BD.
+  Retorna datos crudos (dict).
+end note
+
+@enduml
