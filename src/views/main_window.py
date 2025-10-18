@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from views.sidebar import Sidebar
-from views.content_panel import ContentPanel
+from views.floating_panel import FloatingPanel
 from views.settings_window import SettingsWindow
 from models.item import Item
 from core.hotkey_manager import HotkeyManager
@@ -33,7 +33,7 @@ class MainWindow(QMainWindow):
         self.controller = controller
         self.config_manager = controller.config_manager if controller else None
         self.sidebar = None
-        self.content_panel = None
+        self.floating_panel = None  # Ventana flotante para items
         self.hotkey_manager = None
         self.tray_manager = None
         self.is_visible = True
@@ -70,17 +70,11 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Create sidebar
+        # Create sidebar only (no embedded panel)
         self.sidebar = Sidebar()
         self.sidebar.category_clicked.connect(self.on_category_clicked)
         self.sidebar.settings_clicked.connect(self.open_settings)
         main_layout.addWidget(self.sidebar)
-
-        # Create content panel (initially collapsed)
-        self.content_panel = ContentPanel()
-        self.content_panel.item_clicked.connect(self.on_item_clicked)
-        self.content_panel.width_changed.connect(self.on_panel_width_changed)
-        main_layout.addWidget(self.content_panel)
 
     def load_categories(self, categories):
         """Load categories into sidebar"""
@@ -88,7 +82,7 @@ class MainWindow(QMainWindow):
             self.sidebar.load_categories(categories)
 
     def on_category_clicked(self, category_id: str):
-        """Handle category button click"""
+        """Handle category button click - opens floating panel"""
         try:
             logger.info(f"Category clicked: {category_id}")
 
@@ -99,11 +93,21 @@ class MainWindow(QMainWindow):
 
                 if category:
                     logger.info(f"Category found: {category.name} with {len(category.items)} items")
-                    # Load category into content panel
-                    self.content_panel.load_category(category)
 
-                    # Note: No setFixedWidth here - let ContentPanel handle its own expansion
-                    logger.debug("Category loaded into content panel")
+                    # Create floating panel if it doesn't exist
+                    if not self.floating_panel:
+                        self.floating_panel = FloatingPanel(config_manager=self.config_manager)
+                        self.floating_panel.item_clicked.connect(self.on_item_clicked)
+                        self.floating_panel.window_closed.connect(self.on_floating_panel_closed)
+                        logger.debug("Floating panel created")
+
+                    # Load category into floating panel
+                    self.floating_panel.load_category(category)
+
+                    # Position near sidebar
+                    self.floating_panel.position_near_sidebar(self)
+
+                    logger.debug("Category loaded into floating panel")
                 else:
                     logger.warning(f"Category {category_id} not found")
 
@@ -119,12 +123,12 @@ class MainWindow(QMainWindow):
                 f"Error al cargar categoría:\n{str(e)}\n\nRevisa widget_sidebar_error.log"
             )
 
-    def on_panel_width_changed(self, panel_width: int):
-        """Handle content panel width change"""
-        # Adjust window width: sidebar (70px) + panel width
-        new_width = 70 + panel_width
-        self.setFixedWidth(new_width)
-        logger.debug(f"Window width adjusted to {new_width}px (sidebar: 70px + panel: {panel_width}px)")
+    def on_floating_panel_closed(self):
+        """Handle floating panel closed"""
+        logger.info("Floating panel closed")
+        if self.floating_panel:
+            self.floating_panel.deleteLater()
+            self.floating_panel = None
 
     def on_item_clicked(self, item: Item):
         """Handle item button click"""

@@ -109,9 +109,10 @@ class AppearanceSettings(QWidget):
         # Panel width
         self.panel_width_spin = QSpinBox()
         self.panel_width_spin.setMinimum(250)
-        self.panel_width_spin.setMaximum(400)
+        self.panel_width_spin.setMaximum(800)  # Aumentado a 800px para mayor flexibilidad
         self.panel_width_spin.setValue(300)
         self.panel_width_spin.setSuffix(" px")
+        self.panel_width_spin.setSingleStep(10)  # Incrementos de 10px
         self.panel_width_spin.valueChanged.connect(self.settings_changed)
         window_layout.addRow("Ancho panel:", self.panel_width_spin)
 

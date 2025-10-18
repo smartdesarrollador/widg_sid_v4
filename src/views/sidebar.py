@@ -39,7 +39,7 @@ class Sidebar(QWidget):
         self.setStyleSheet("""
             QWidget {
                 background-color: #2b2b2b;
-                border-right: 1px solid #1e1e1e;
+                border-left: 1px solid #1e1e1e;
             }
         """)
 

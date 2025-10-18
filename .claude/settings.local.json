@@ -13,7 +13,8 @@
       "Bash(rm WidgetSidebar.spec run_migration.py)",
       "Bash(rm -rf build)",
       "Bash(rm README.md USER_GUIDE.md widget_sidebar.db)",
-      "Bash(rm nul)"
+      "Bash(rm nul)",
+      "Bash(python main.py)"
     ],
     "deny": [],
     "ask": []
