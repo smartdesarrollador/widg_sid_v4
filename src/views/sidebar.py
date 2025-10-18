@@ -1,8 +1,8 @@
 """
-Sidebar View - Vertical sidebar with category buttons
+Sidebar View - Vertical sidebar with category buttons and scroll navigation
 """
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QScrollArea
+from PyQt6.QtCore import Qt, pyqtSignal, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QFont
 from typing import List
 import sys
@@ -14,7 +14,7 @@ from views.widgets.button_widget import CategoryButton
 
 
 class Sidebar(QWidget):
-    """Vertical sidebar with category buttons"""
+    """Vertical sidebar with category buttons and scroll navigation"""
 
     # Signal emitted when a category button is clicked
     category_clicked = pyqtSignal(str)  # category_id
@@ -26,6 +26,7 @@ class Sidebar(QWidget):
         super().__init__(parent)
         self.category_buttons = {}
         self.active_button = None
+        self.scroll_area = None
 
         self.init_ui()
 
@@ -63,14 +64,87 @@ class Sidebar(QWidget):
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(title_label)
 
-        # Container for category buttons
-        self.buttons_layout = QVBoxLayout()
-        self.buttons_layout.setContentsMargins(0, 10, 0, 10)
-        self.buttons_layout.setSpacing(5)
-        main_layout.addLayout(self.buttons_layout)
+        # Scroll up button
+        self.scroll_up_button = QPushButton("▲")
+        self.scroll_up_button.setFixedSize(70, 30)
+        self.scroll_up_button.setToolTip("Desplazar arriba")
+        self.scroll_up_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.scroll_up_button.setStyleSheet("""
+            QPushButton {
+                background-color: #1e1e1e;
+                color: #007acc;
+                border: none;
+                border-bottom: 1px solid #3d3d3d;
+                font-size: 12pt;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #3d3d3d;
+                color: #00a0ff;
+            }
+            QPushButton:pressed {
+                background-color: #007acc;
+                color: #ffffff;
+            }
+            QPushButton:disabled {
+                color: #555555;
+                background-color: #252525;
+            }
+        """)
+        self.scroll_up_button.clicked.connect(self.scroll_up)
+        main_layout.addWidget(self.scroll_up_button)
 
-        # Add stretch to push buttons to top
-        main_layout.addStretch()
+        # Scroll area for category buttons
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll_area.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background-color: #2b2b2b;
+            }
+        """)
+
+        # Container widget for buttons
+        buttons_container = QWidget()
+        self.buttons_layout = QVBoxLayout(buttons_container)
+        self.buttons_layout.setContentsMargins(0, 5, 0, 5)
+        self.buttons_layout.setSpacing(5)
+        self.buttons_layout.addStretch()
+
+        self.scroll_area.setWidget(buttons_container)
+        main_layout.addWidget(self.scroll_area)
+
+        # Scroll down button
+        self.scroll_down_button = QPushButton("▼")
+        self.scroll_down_button.setFixedSize(70, 30)
+        self.scroll_down_button.setToolTip("Desplazar abajo")
+        self.scroll_down_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.scroll_down_button.setStyleSheet("""
+            QPushButton {
+                background-color: #1e1e1e;
+                color: #007acc;
+                border: none;
+                border-top: 1px solid #3d3d3d;
+                font-size: 12pt;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #3d3d3d;
+                color: #00a0ff;
+            }
+            QPushButton:pressed {
+                background-color: #007acc;
+                color: #ffffff;
+            }
+            QPushButton:disabled {
+                color: #555555;
+                background-color: #252525;
+            }
+        """)
+        self.scroll_down_button.clicked.connect(self.scroll_down)
+        main_layout.addWidget(self.scroll_down_button)
 
         # Settings button at the bottom
         self.settings_button = QPushButton("⚙")
@@ -97,6 +171,53 @@ class Sidebar(QWidget):
         self.settings_button.clicked.connect(self.on_settings_clicked)
         main_layout.addWidget(self.settings_button)
 
+        # Update scroll button states
+        self.update_scroll_buttons()
+
+    def scroll_up(self):
+        """Scroll the category list up"""
+        scrollbar = self.scroll_area.verticalScrollBar()
+        current_value = scrollbar.value()
+        new_value = max(0, current_value - 70)  # Scroll by button height
+
+        # Animate scroll
+        self.animate_scroll(current_value, new_value)
+
+    def scroll_down(self):
+        """Scroll the category list down"""
+        scrollbar = self.scroll_area.verticalScrollBar()
+        current_value = scrollbar.value()
+        new_value = min(scrollbar.maximum(), current_value + 70)  # Scroll by button height
+
+        # Animate scroll
+        self.animate_scroll(current_value, new_value)
+
+    def animate_scroll(self, start_value, end_value):
+        """Animate scroll movement"""
+        scrollbar = self.scroll_area.verticalScrollBar()
+
+        # Create animation
+        self.scroll_animation = QPropertyAnimation(scrollbar, b"value")
+        self.scroll_animation.setDuration(200)
+        self.scroll_animation.setStartValue(start_value)
+        self.scroll_animation.setEndValue(end_value)
+        self.scroll_animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        self.scroll_animation.finished.connect(self.update_scroll_buttons)
+        self.scroll_animation.start()
+
+    def update_scroll_buttons(self):
+        """Update scroll button enabled/disabled state"""
+        if not self.scroll_area:
+            return
+
+        scrollbar = self.scroll_area.verticalScrollBar()
+
+        # Disable up button if at top
+        self.scroll_up_button.setEnabled(scrollbar.value() > 0)
+
+        # Disable down button if at bottom
+        self.scroll_down_button.setEnabled(scrollbar.value() < scrollbar.maximum())
+
     def load_categories(self, categories: List[Category]):
         """Load and create buttons for categories"""
         # Clear existing buttons
@@ -111,7 +232,12 @@ class Sidebar(QWidget):
             button.clicked.connect(lambda checked, cat_id=category.id: self.on_category_clicked(cat_id))
 
             self.category_buttons[category.id] = button
-            self.buttons_layout.addWidget(button)
+            # Insert before the stretch
+            self.buttons_layout.insertWidget(self.buttons_layout.count() - 1, button)
+
+        # Update scroll buttons after loading
+        self.scroll_area.verticalScrollBar().valueChanged.connect(self.update_scroll_buttons)
+        self.update_scroll_buttons()
 
     def clear_buttons(self):
         """Clear all category buttons"""
