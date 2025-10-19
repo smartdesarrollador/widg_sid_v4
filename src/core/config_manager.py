@@ -461,7 +461,7 @@ class ConfigManager:
             Item: Item object
         """
         # Map database type to ItemType enum
-        type_str = data.get('type', 'TEXT').lower()
+        type_str = data.get('type', 'TEXT').upper().lower()  # Convert from DB (TEXT/URL/CODE/PATH) to enum (text/url/code/path)
         try:
             item_type = ItemType(type_str)
         except ValueError:
