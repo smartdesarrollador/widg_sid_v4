@@ -209,6 +209,21 @@ class ItemEditorDialog(QDialog):
                 self.content_input.setFocus()
                 return False
 
+        # Validate PATH if type is PATH
+        if selected_type == ItemType.PATH:
+            if not self.validate_path(content):
+                # Show warning but allow to save anyway
+                reply = QMessageBox.question(
+                    self,
+                    "Ruta no encontrada",
+                    f"La ruta '{content}' no existe en el sistema.\n\n¿Deseas guardarla de todas formas?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No
+                )
+                if reply == QMessageBox.StandardButton.No:
+                    self.content_input.setFocus()
+                    return False
+
         return True
 
     def validate_url(self, url: str) -> bool:
@@ -230,6 +245,23 @@ class ItemEditorDialog(QDialog):
             r'(?::\d+)?'  # optional port
             r'(?:/?|[/?]\S+)$', re.IGNORECASE)
         return url_pattern.match(url) is not None
+
+    def validate_path(self, path_str: str) -> bool:
+        """
+        Validate if path exists
+
+        Args:
+            path_str: Path string to validate
+
+        Returns:
+            True if path exists
+        """
+        try:
+            from pathlib import Path
+            path = Path(path_str)
+            return path.exists()
+        except Exception:
+            return False
 
     def get_item_data(self) -> dict:
         """
