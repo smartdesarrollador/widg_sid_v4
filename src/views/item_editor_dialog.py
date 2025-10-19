@@ -5,7 +5,7 @@ Dialog for creating and editing items
 
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QTextEdit, QComboBox, QPushButton, QFormLayout, QMessageBox
+    QTextEdit, QComboBox, QPushButton, QFormLayout, QMessageBox, QCheckBox
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -43,7 +43,7 @@ class ItemEditorDialog(QDialog):
         # Window properties
         title = "Editar Item" if self.is_edit_mode else "Nuevo Item"
         self.setWindowTitle(title)
-        self.setFixedSize(450, 400)
+        self.setFixedSize(450, 450)  # Increased height to accommodate sensitive checkbox
         self.setModal(True)
 
         # Apply dark theme
@@ -120,6 +120,40 @@ class ItemEditorDialog(QDialog):
         self.tags_input.setPlaceholderText("tag1, tag2, tag3 (opcional)")
         form_layout.addRow("Tags:", self.tags_input)
 
+        # Sensitive checkbox
+        self.sensitive_checkbox = QCheckBox("Marcar como sensible (cifrar contenido)")
+        self.sensitive_checkbox.setStyleSheet("""
+            QCheckBox {
+                color: #cccccc;
+                font-size: 10pt;
+                spacing: 8px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border: 2px solid #3d3d3d;
+                border-radius: 3px;
+                background-color: #2d2d2d;
+            }
+            QCheckBox::indicator:hover {
+                border: 2px solid #007acc;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #cc0000;
+                border: 2px solid #cc0000;
+                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iMTIiIHZpZXdCb3g9IjAgMCAxMiAxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTAuNSAzTDQuNSA5IDEuNSA2IiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==);
+            }
+            QCheckBox::indicator:checked:hover {
+                background-color: #9e0000;
+                border: 2px solid #9e0000;
+            }
+        """)
+        self.sensitive_checkbox.setToolTip(
+            "Los items sensibles se cifran con AES-256 en la base de datos.\n"
+            "El contenido será visible solo en esta aplicación."
+        )
+        form_layout.addRow("", self.sensitive_checkbox)
+
         main_layout.addLayout(form_layout)
 
         # Required fields note
@@ -167,6 +201,10 @@ class ItemEditorDialog(QDialog):
         # Load tags
         if self.item.tags:
             self.tags_input.setText(", ".join(self.item.tags))
+
+        # Load sensitive state
+        if hasattr(self.item, 'is_sensitive'):
+            self.sensitive_checkbox.setChecked(self.item.is_sensitive)
 
     def validate(self) -> bool:
         """
@@ -278,7 +316,8 @@ class ItemEditorDialog(QDialog):
             "label": self.label_input.text().strip(),
             "content": self.content_input.toPlainText().strip(),
             "type": self.type_combo.currentData(),
-            "tags": tags
+            "tags": tags,
+            "is_sensitive": self.sensitive_checkbox.isChecked()
         }
 
     def on_save(self):

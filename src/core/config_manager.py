@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from models.category import Category
 from models.item import Item, ItemType
 from database.db_manager import DBManager
+from core.encryption_manager import EncryptionManager
 
 
 class ConfigManager:
@@ -43,6 +44,10 @@ class ConfigManager:
 
         # Initialize database manager
         self.db = DBManager(self.db_path)
+
+        # Initialize encryption manager
+        env_path = str(self.base_dir / ".env")
+        self.encryption_manager = EncryptionManager(env_path)
 
         # Cache for categories
         self._categories_cache: Optional[List[Category]] = None

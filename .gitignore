@@ -43,12 +43,18 @@ venv.bak/
 .DS_Store
 Thumbs.db
 desktop.ini
+nul
 
 # Project specific
 config.json
 *.log
 *.bak
 *.db
+
+# Environment variables (contains encryption key - NEVER commit!)
+.env
+.env.*
+!.env.example
 
 # PyInstaller
 *.manifest
@@ -64,3 +70,7 @@ htmlcov/
 installer/
 *.exe
 *.msi
+
+
+# utilities
+util/

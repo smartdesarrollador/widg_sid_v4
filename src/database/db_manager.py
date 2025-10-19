@@ -34,7 +34,9 @@ class DBManager:
 
     def _ensure_database(self):
         """Create database and tables if they don't exist"""
-        if not self.db_path.exists():
+        # Check if it's an in-memory database or file doesn't exist
+        is_memory_db = str(self.db_path) == ":memory:"
+        if is_memory_db or not self.db_path.exists():
             logger.info("Creating new database...")
             self._create_database()
         else:
@@ -84,7 +86,8 @@ class DBManager:
 
     def _create_database(self):
         """Create database schema with all tables and indices"""
-        conn = sqlite3.connect(self.db_path)
+        # Use self.connect() to ensure we use the same connection (important for :memory:)
+        conn = self.connect()
         cursor = conn.cursor()
 
         # Create tables
@@ -155,7 +158,7 @@ class DBManager:
         """)
 
         conn.commit()
-        conn.close()
+        # Don't close the connection - it's managed by self.connection
         logger.info("Database schema created successfully")
 
     def execute_query(self, query: str, params: tuple = ()) -> List[Dict]:
@@ -409,7 +412,7 @@ class DBManager:
             category_id: Category ID
 
         Returns:
-            List[Dict]: List of item dictionaries
+            List[Dict]: List of item dictionaries (content decrypted if sensitive)
         """
         query = """
             SELECT * FROM items
@@ -418,8 +421,13 @@ class DBManager:
         """
         results = self.execute_query(query, (category_id,))
 
-        # Parse tags from JSON string to list
+        # Initialize encryption manager for decrypting sensitive items
+        from core.encryption_manager import EncryptionManager
+        encryption_manager = EncryptionManager()
+
+        # Parse tags and decrypt sensitive content
         for item in results:
+            # Parse tags from JSON
             if item['tags']:
                 try:
                     item['tags'] = json.loads(item['tags'])
@@ -427,6 +435,15 @@ class DBManager:
                     item['tags'] = []
             else:
                 item['tags'] = []
+
+            # Decrypt sensitive content
+            if item.get('is_sensitive') and item.get('content'):
+                try:
+                    item['content'] = encryption_manager.decrypt(item['content'])
+                    logger.debug(f"Content decrypted for item ID: {item['id']}")
+                except Exception as e:
+                    logger.error(f"Failed to decrypt item {item['id']}: {e}")
+                    item['content'] = "[DECRYPTION ERROR]"
 
         return results
 
@@ -438,13 +455,25 @@ class DBManager:
             item_id: Item ID
 
         Returns:
-            Optional[Dict]: Item dictionary or None
+            Optional[Dict]: Item dictionary or None (content decrypted if sensitive)
         """
         query = "SELECT * FROM items WHERE id = ?"
         result = self.execute_query(query, (item_id,))
         if result:
             item = result[0]
             item['tags'] = json.loads(item['tags']) if item['tags'] else []
+
+            # Decrypt sensitive content
+            if item.get('is_sensitive') and item.get('content'):
+                from core.encryption_manager import EncryptionManager
+                encryption_manager = EncryptionManager()
+                try:
+                    item['content'] = encryption_manager.decrypt(item['content'])
+                    logger.debug(f"Content decrypted for item ID: {item_id}")
+                except Exception as e:
+                    logger.error(f"Failed to decrypt item {item_id}: {e}")
+                    item['content'] = "[DECRYPTION ERROR]"
+
             return item
         return None
 
@@ -457,15 +486,22 @@ class DBManager:
         Args:
             category_id: Category ID
             label: Item label
-            content: Item content
+            content: Item content (will be encrypted if is_sensitive=True)
             item_type: Item type (TEXT, URL, CODE, PATH)
             icon: Item icon (optional)
-            is_sensitive: Whether content is sensitive
+            is_sensitive: Whether content is sensitive (will encrypt content)
             tags: List of tags (optional)
 
         Returns:
             int: New item ID
         """
+        # Encrypt content if sensitive
+        if is_sensitive and content:
+            from core.encryption_manager import EncryptionManager
+            encryption_manager = EncryptionManager()
+            content = encryption_manager.encrypt(content)
+            logger.info(f"Content encrypted for sensitive item: {label}")
+
         tags_json = json.dumps(tags or [])
         query = """
             INSERT INTO items
@@ -476,7 +512,7 @@ class DBManager:
             query,
             (category_id, label, content, item_type, icon, is_sensitive, tags_json)
         )
-        logger.info(f"Item added: {label} (ID: {item_id})")
+        logger.info(f"Item added: {label} (ID: {item_id}, Sensitive: {is_sensitive})")
         return item_id
 
     def update_item(self, item_id: int, **kwargs) -> None:
@@ -491,10 +527,30 @@ class DBManager:
         updates = []
         params = []
 
+        # Get current item to check if it's sensitive
+        current_item = self.get_item(item_id)
+        if not current_item:
+            logger.warning(f"Item not found for update: ID {item_id}")
+            return
+
+        # Check if item is being marked as sensitive or if it's already sensitive
+        is_currently_sensitive = current_item.get('is_sensitive', False)
+        will_be_sensitive = kwargs.get('is_sensitive', is_currently_sensitive)
+
         for field, value in kwargs.items():
             if field in allowed_fields:
+                # Handle tags serialization
                 if field == 'tags':
                     value = json.dumps(value)
+                # Handle content encryption for sensitive items
+                elif field == 'content' and will_be_sensitive and value:
+                    from core.encryption_manager import EncryptionManager
+                    encryption_manager = EncryptionManager()
+                    # Only encrypt if not already encrypted
+                    if not encryption_manager.is_encrypted(value):
+                        value = encryption_manager.encrypt(value)
+                        logger.info(f"Content encrypted for item ID: {item_id}")
+
                 updates.append(f"{field} = ?")
                 params.append(value)
 

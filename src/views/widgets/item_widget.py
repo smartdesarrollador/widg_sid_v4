@@ -25,6 +25,9 @@ class ItemButton(QFrame):
         super().__init__(parent)
         self.item = item
         self.is_copied = False
+        self.is_revealed = False  # Track if sensitive content is revealed
+        self.reveal_timer = None  # Timer for auto-hide
+        self.clipboard_clear_timer = None  # Timer for clipboard clearing
 
         self.init_ui()
 
@@ -44,8 +47,9 @@ class ItemButton(QFrame):
         left_layout = QVBoxLayout()
         left_layout.setSpacing(5)
 
-        # Item label
-        self.label_widget = QLabel(self.item.label)
+        # Item label (ofuscar si es sensible y no revelado)
+        label_text = self.get_display_label()
+        self.label_widget = QLabel(label_text)
         label_font = QFont()
         label_font.setPointSize(10)
         self.label_widget.setFont(label_font)
@@ -74,6 +78,30 @@ class ItemButton(QFrame):
             left_layout.addLayout(tags_layout)
 
         main_layout.addLayout(left_layout, 1)
+
+        # Reveal button for sensitive items
+        if hasattr(self.item, 'is_sensitive') and self.item.is_sensitive:
+            self.reveal_button = QPushButton("👁")
+            self.reveal_button.setFixedSize(35, 35)
+            self.reveal_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #cc0000;
+                    color: #ffffff;
+                    border: none;
+                    border-radius: 4px;
+                    font-size: 16pt;
+                }
+                QPushButton:hover {
+                    background-color: #9e0000;
+                }
+                QPushButton:pressed {
+                    background-color: #780000;
+                }
+            """)
+            self.reveal_button.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.reveal_button.setToolTip("Revelar/Ocultar contenido sensible")
+            self.reveal_button.clicked.connect(self.toggle_reveal)
+            main_layout.addWidget(self.reveal_button)
 
         # Right side: Action buttons based on item type
         if self.item.type == ItemType.URL:
@@ -155,22 +183,40 @@ class ItemButton(QFrame):
 
             main_layout.addLayout(path_buttons_layout)
 
-        # Set initial style
-        self.setStyleSheet("""
-            QFrame {
-                background-color: #2d2d2d;
-                border: none;
-                border-bottom: 1px solid #1e1e1e;
-            }
-            QFrame:hover {
-                background-color: #3d3d3d;
-            }
-            QLabel {
-                color: #cccccc;
-                background-color: transparent;
-                border: none;
-            }
-        """)
+        # Set initial style (different for sensitive items)
+        if hasattr(self.item, 'is_sensitive') and self.item.is_sensitive:
+            self.setStyleSheet("""
+                QFrame {
+                    background-color: #3d2020;
+                    border: none;
+                    border-left: 3px solid #cc0000;
+                    border-bottom: 1px solid #1e1e1e;
+                }
+                QFrame:hover {
+                    background-color: #4d2525;
+                }
+                QLabel {
+                    color: #cccccc;
+                    background-color: transparent;
+                    border: none;
+                }
+            """)
+        else:
+            self.setStyleSheet("""
+                QFrame {
+                    background-color: #2d2d2d;
+                    border: none;
+                    border-bottom: 1px solid #1e1e1e;
+                }
+                QFrame:hover {
+                    background-color: #3d3d3d;
+                }
+                QLabel {
+                    color: #cccccc;
+                    background-color: transparent;
+                    border: none;
+                }
+            """)
 
     def mousePressEvent(self, event):
         """Handle mouse press event"""
@@ -185,6 +231,10 @@ class ItemButton(QFrame):
 
         # Show copied feedback
         self.show_copied_feedback()
+
+        # If sensitive item, start clipboard auto-clear timer
+        if hasattr(self.item, 'is_sensitive') and self.item.is_sensitive:
+            self.start_clipboard_clear_timer()
 
     def open_in_browser(self):
         """Open URL in default browser"""
@@ -308,20 +358,36 @@ class ItemButton(QFrame):
         """Show visual feedback that item was copied"""
         self.is_copied = True
 
-        # Change style temporarily
-        self.setStyleSheet("""
-            QFrame {
-                background-color: #007acc;
-                border: none;
-                border-bottom: 1px solid #005a9e;
-            }
-            QLabel {
-                color: #ffffff;
-                background-color: transparent;
-                border: none;
-                font-weight: bold;
-            }
-        """)
+        # Different style for sensitive items (orange/warning color)
+        if hasattr(self.item, 'is_sensitive') and self.item.is_sensitive:
+            self.setStyleSheet("""
+                QFrame {
+                    background-color: #cc7a00;
+                    border: none;
+                    border-bottom: 1px solid #9e5e00;
+                }
+                QLabel {
+                    color: #ffffff;
+                    background-color: transparent;
+                    border: none;
+                    font-weight: bold;
+                }
+            """)
+        else:
+            # Normal items: blue feedback
+            self.setStyleSheet("""
+                QFrame {
+                    background-color: #007acc;
+                    border: none;
+                    border-bottom: 1px solid #005a9e;
+                }
+                QLabel {
+                    color: #ffffff;
+                    background-color: transparent;
+                    border: none;
+                    font-weight: bold;
+                }
+            """)
 
         # Reset after 500ms
         QTimer.singleShot(500, self.reset_style)
@@ -329,18 +395,106 @@ class ItemButton(QFrame):
     def reset_style(self):
         """Reset button style to normal"""
         self.is_copied = False
-        self.setStyleSheet("""
-            QFrame {
-                background-color: #2d2d2d;
-                border: none;
-                border-bottom: 1px solid #1e1e1e;
-            }
-            QFrame:hover {
-                background-color: #3d3d3d;
-            }
-            QLabel {
-                color: #cccccc;
-                background-color: transparent;
-                border: none;
-            }
-        """)
+        # Apply special style for sensitive items
+        if hasattr(self.item, 'is_sensitive') and self.item.is_sensitive:
+            self.setStyleSheet("""
+                QFrame {
+                    background-color: #3d2020;
+                    border: none;
+                    border-left: 3px solid #cc0000;
+                    border-bottom: 1px solid #1e1e1e;
+                }
+                QFrame:hover {
+                    background-color: #4d2525;
+                }
+                QLabel {
+                    color: #cccccc;
+                    background-color: transparent;
+                    border: none;
+                }
+            """)
+        else:
+            self.setStyleSheet("""
+                QFrame {
+                    background-color: #2d2d2d;
+                    border: none;
+                    border-bottom: 1px solid #1e1e1e;
+                }
+                QFrame:hover {
+                    background-color: #3d3d3d;
+                }
+                QLabel {
+                    color: #cccccc;
+                    background-color: transparent;
+                    border: none;
+                }
+            """)
+
+    def get_display_label(self):
+        """Get display label (ofuscado si es sensible y no revelado)"""
+        if hasattr(self.item, 'is_sensitive') and self.item.is_sensitive and not self.is_revealed:
+            # Ofuscar: mostrar label + (********)
+            content_preview = "********"
+            return f"{self.item.label} ({content_preview})"
+        elif hasattr(self.item, 'is_sensitive') and self.item.is_sensitive and self.is_revealed:
+            # Revelado: mostrar label + preview del contenido
+            content = self.item.content[:30] if len(self.item.content) > 30 else self.item.content
+            return f"{self.item.label} ({content}...)" if len(self.item.content) > 30 else f"{self.item.label} ({content})"
+        else:
+            # Item normal: solo el label
+            return self.item.label
+
+    def toggle_reveal(self):
+        """Toggle reveal/hide sensitive content"""
+        self.is_revealed = not self.is_revealed
+
+        # Update label
+        self.label_widget.setText(self.get_display_label())
+
+        if self.is_revealed:
+            # Cambiar icono del boton
+            self.reveal_button.setText("🙈")
+            self.reveal_button.setToolTip("Ocultar contenido sensible")
+
+            # Cancelar timer anterior si existe
+            if self.reveal_timer:
+                self.reveal_timer.stop()
+
+            # Auto-ocultar despues de 10 segundos
+            self.reveal_timer = QTimer()
+            self.reveal_timer.setSingleShot(True)
+            self.reveal_timer.timeout.connect(self.auto_hide)
+            self.reveal_timer.start(10000)  # 10 segundos
+        else:
+            # Cambiar icono del boton
+            self.reveal_button.setText("👁")
+            self.reveal_button.setToolTip("Revelar/Ocultar contenido sensible")
+
+            # Cancelar timer si existe
+            if self.reveal_timer:
+                self.reveal_timer.stop()
+
+    def auto_hide(self):
+        """Auto-hide sensitive content after timeout"""
+        if self.is_revealed:
+            self.toggle_reveal()
+
+    def start_clipboard_clear_timer(self):
+        """Start timer to clear clipboard after 30 seconds for sensitive items"""
+        # Cancel previous timer if exists
+        if self.clipboard_clear_timer:
+            self.clipboard_clear_timer.stop()
+
+        # Start 30-second timer
+        self.clipboard_clear_timer = QTimer()
+        self.clipboard_clear_timer.setSingleShot(True)
+        self.clipboard_clear_timer.timeout.connect(self.clear_clipboard)
+        self.clipboard_clear_timer.start(30000)  # 30 seconds
+
+    def clear_clipboard(self):
+        """Clear clipboard content"""
+        try:
+            import pyperclip
+            pyperclip.copy("")  # Clear clipboard
+        except Exception as e:
+            print(f"Error clearing clipboard: {e}")
