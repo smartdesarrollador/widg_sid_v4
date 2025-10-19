@@ -301,7 +301,7 @@ class MainWindow(QMainWindow):
     def minimize_window(self):
         """Minimize the window"""
         logger.info("Minimizing window")
-        self.hide_window()
+        self.showMinimized()
 
     def close_window(self):
         """Close the application"""
