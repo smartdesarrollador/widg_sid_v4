@@ -13,7 +13,7 @@ class SessionManager:
     """Manages user sessions with secure tokens"""
 
     # Session durations in hours
-    SESSION_DURATION_NORMAL = 8  # 8 hours
+    SESSION_DURATION_NORMAL = 1  # 1 hours
     SESSION_DURATION_REMEMBER = 24  # 24 hours
 
     def __init__(self, env_file: str = ".env"):
