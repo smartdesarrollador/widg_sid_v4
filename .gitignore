@@ -77,9 +77,14 @@ util/
 
 # Documentation (local only)
 FASE*_AUTH_COMPLETADA.md
+GUIA_BACKUP_RESTAURACION.md
 
 # Test environment files
 .env.test*
 
 # Auth reset script (local utility)
 reset_auth.py
+
+# Backup folders and files
+backup_*/
+backup_widget.py
