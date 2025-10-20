@@ -19,6 +19,7 @@ class TrayManager(QObject):
     show_window_requested = pyqtSignal()
     hide_window_requested = pyqtSignal()
     settings_requested = pyqtSignal()
+    logout_requested = pyqtSignal()
     quit_requested = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -94,6 +95,14 @@ class TrayManager(QObject):
         # Separator
         self.tray_menu.addSeparator()
 
+        # Logout action
+        logout_action = QAction("🔒 Cerrar Sesión", self.tray_menu)
+        logout_action.triggered.connect(self._on_logout)
+        self.tray_menu.addAction(logout_action)
+
+        # Separator
+        self.tray_menu.addSeparator()
+
         # Quit action
         quit_action = QAction("Salir", self.tray_menu)
         quit_action.triggered.connect(self._on_quit)
@@ -128,6 +137,10 @@ class TrayManager(QObject):
     def _on_settings(self):
         """Handle settings menu action"""
         self.settings_requested.emit()
+
+    def _on_logout(self):
+        """Handle logout menu action"""
+        self.logout_requested.emit()
 
     def _on_quit(self):
         """Handle quit menu action"""

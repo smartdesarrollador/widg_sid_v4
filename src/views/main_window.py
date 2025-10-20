@@ -16,6 +16,7 @@ from views.settings_window import SettingsWindow
 from models.item import Item
 from core.hotkey_manager import HotkeyManager
 from core.tray_manager import TrayManager
+from core.session_manager import SessionManager
 
 # Get logger
 logger = logging.getLogger(__name__)
@@ -278,6 +279,7 @@ class MainWindow(QMainWindow):
         self.tray_manager.show_window_requested.connect(self.show_window)
         self.tray_manager.hide_window_requested.connect(self.hide_window)
         self.tray_manager.settings_requested.connect(self.show_settings)
+        self.tray_manager.logout_requested.connect(self.logout_session)
         self.tray_manager.quit_requested.connect(self.quit_application)
 
         # Setup tray icon
@@ -344,6 +346,35 @@ class MainWindow(QMainWindow):
             self.setWindowOpacity(opacity)
 
         print("Settings applied")
+
+    def logout_session(self):
+        """Logout current session"""
+        logger.info("Logging out...")
+
+        # Confirm logout
+        reply = QMessageBox.question(
+            self,
+            "Cerrar Sesión",
+            "¿Estás seguro que deseas cerrar sesión?\n\nDeberás ingresar tu contraseña nuevamente al abrir la aplicación.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            # Invalidate session
+            session_manager = SessionManager()
+            session_manager.invalidate_session()
+            logger.info("Session invalidated")
+
+            # Show notification
+            if self.tray_manager:
+                self.tray_manager.show_message(
+                    "Sesión Cerrada",
+                    "Has cerrado sesión exitosamente. La aplicación se cerrará."
+                )
+
+            # Quit application
+            self.quit_application()
 
     def quit_application(self):
         """Quit the application"""

@@ -74,3 +74,12 @@ installer/
 
 # utilities
 util/
+
+# Documentation (local only)
+FASE*_AUTH_COMPLETADA.md
+
+# Test environment files
+.env.test*
+
+# Auth reset script (local utility)
+reset_auth.py

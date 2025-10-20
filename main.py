@@ -68,6 +68,10 @@ if not getattr(sys, 'frozen', False):
 
 from controllers.main_controller import MainController
 from views.main_window import MainWindow
+from core.auth_manager import AuthManager
+from core.session_manager import SessionManager
+from views.first_time_wizard import FirstTimeWizard
+from views.login_dialog import LoginDialog
 
 
 def get_app_dir() -> Path:
@@ -102,6 +106,49 @@ def ensure_database(db_path: Path) -> None:
         print("Database created successfully")
 
 
+def authenticate() -> bool:
+    """
+    Handle authentication flow
+
+    Returns:
+        True if authenticated successfully, False if user cancelled
+    """
+    logger.info("Starting authentication flow...")
+
+    auth_manager = AuthManager()
+    session_manager = SessionManager()
+
+    # Check if valid session exists
+    if session_manager.validate_session():
+        logger.info("Valid session found - skipping login")
+        return True
+
+    # Check if first time
+    if auth_manager.is_first_time():
+        logger.info("First time execution - showing FirstTimeWizard")
+        wizard = FirstTimeWizard()
+        result = wizard.exec()
+
+        if result:
+            logger.info("Password created successfully")
+            return True
+        else:
+            logger.info("User cancelled first time setup")
+            return False
+
+    # Show login dialog
+    logger.info("No valid session - showing LoginDialog")
+    login = LoginDialog()
+    result = login.exec()
+
+    if result:
+        logger.info("Login successful")
+        return True
+    else:
+        logger.info("User cancelled login")
+        return False
+
+
 def main():
     """Main entry point for Widget Sidebar application"""
     try:
@@ -127,6 +174,16 @@ def main():
         app = QApplication(sys.argv)
         app.setApplicationName("Widget Sidebar")
         logger.info("PyQt6 application initialized")
+
+        # Authentication flow
+        logger.info("=" * 60)
+        logger.info("AUTHENTICATION")
+        logger.info("=" * 60)
+        if not authenticate():
+            logger.info("Authentication cancelled - exiting application")
+            sys.exit(0)
+        logger.info("Authentication successful")
+        logger.info("=" * 60)
 
         # Initialize main controller with database path
         logger.info("Initializing MVC architecture...")
