@@ -13,13 +13,20 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from models.item import Item, ItemType
+from core.usage_tracker import UsageTracker
+from core.favorites_manager import FavoritesManager
+import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ItemButton(QFrame):
     """Custom item button widget for content panel with tags support"""
 
-    # Signal emitted when item is clicked with the item
+    # Signals
     item_clicked = pyqtSignal(object)
+    favorite_toggled = pyqtSignal(int, bool)  # item_id, is_favorite
 
     def __init__(self, item: Item, parent=None):
         super().__init__(parent)
@@ -28,6 +35,13 @@ class ItemButton(QFrame):
         self.is_revealed = False  # Track if sensitive content is revealed
         self.reveal_timer = None  # Timer for auto-hide
         self.clipboard_clear_timer = None  # Timer for clipboard clearing
+
+        # Usage tracking
+        self.usage_tracker = UsageTracker()
+        self.execution_start_time = None
+
+        # Favorites management
+        self.favorites_manager = FavoritesManager()
 
         self.init_ui()
 
@@ -43,9 +57,13 @@ class ItemButton(QFrame):
         main_layout.setContentsMargins(15, 8, 15, 8)
         main_layout.setSpacing(10)
 
-        # Left side: Item info (label + tags)
+        # Left side: Item info (label + badges + tags + stats)
         left_layout = QVBoxLayout()
         left_layout.setSpacing(5)
+
+        # Top row: Label + Badge
+        label_row = QHBoxLayout()
+        label_row.setSpacing(8)
 
         # Item label (ofuscar si es sensible y no revelado)
         label_text = self.get_display_label()
@@ -53,7 +71,24 @@ class ItemButton(QFrame):
         label_font = QFont()
         label_font.setPointSize(10)
         self.label_widget.setFont(label_font)
-        left_layout.addWidget(self.label_widget)
+        label_row.addWidget(self.label_widget)
+
+        # Badge (Popular / Nuevo)
+        badge = self.get_badge()
+        if badge:
+            badge_label = QLabel(badge)
+            badge_label.setStyleSheet("""
+                QLabel {
+                    background-color: transparent;
+                    color: #cccccc;
+                    font-size: 14pt;
+                    padding: 0px;
+                }
+            """)
+            label_row.addWidget(badge_label)
+
+        label_row.addStretch()
+        left_layout.addLayout(label_row)
 
         # Tags container (only if item has tags)
         if self.item.tags and len(self.item.tags) > 0:
@@ -77,7 +112,41 @@ class ItemButton(QFrame):
             tags_layout.addStretch()
             left_layout.addLayout(tags_layout)
 
+        # Usage stats (use_count + last_used)
+        stats_text = self.get_usage_stats()
+        if stats_text:
+            stats_label = QLabel(stats_text)
+            stats_label.setStyleSheet("""
+                QLabel {
+                    color: #858585;
+                    font-size: 8pt;
+                    font-style: italic;
+                    background-color: transparent;
+                    border: none;
+                }
+            """)
+            left_layout.addWidget(stats_label)
+
         main_layout.addLayout(left_layout, 1)
+
+        # Favorite button (star)
+        self.favorite_btn = QPushButton()
+        self.favorite_btn.setFixedSize(30, 30)
+        self.favorite_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.favorite_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                font-size: 16pt;
+            }
+            QPushButton:hover {
+                background-color: #3e3e42;
+                border-radius: 3px;
+            }
+        """)
+        self.favorite_btn.clicked.connect(self.toggle_favorite)
+        self.update_favorite_button()
+        main_layout.addWidget(self.favorite_btn)
 
         # Reveal button for sensitive items
         if hasattr(self.item, 'is_sensitive') and self.item.is_sensitive:
@@ -226,11 +295,19 @@ class ItemButton(QFrame):
 
     def on_clicked(self):
         """Handle button click"""
+        # Track clipboard copy (comando simple)
+        if self.item.type not in [ItemType.URL, ItemType.PATH]:
+            start_time = self.usage_tracker.track_execution_start(self.item.id)
+
         # Emit signal with item
         self.item_clicked.emit(self.item)
 
         # Show copied feedback
         self.show_copied_feedback()
+
+        # Track completion for clipboard copy
+        if self.item.type not in [ItemType.URL, ItemType.PATH]:
+            self.usage_tracker.track_execution_end(self.item.id, start_time, True, None)
 
         # If sensitive item, start clipboard auto-clear timer
         if hasattr(self.item, 'is_sensitive') and self.item.is_sensitive:
@@ -239,36 +316,55 @@ class ItemButton(QFrame):
     def open_in_browser(self):
         """Open URL in default browser"""
         if self.item.type == ItemType.URL:
-            url = self.item.content
-            # Ensure URL has proper protocol
-            if not url.startswith(('http://', 'https://')):
-                if url.startswith('www.'):
-                    url = 'https://' + url
-                else:
-                    url = 'https://' + url
+            # Track execution start
+            start_time = self.usage_tracker.track_execution_start(self.item.id)
+            success = False
+            error_msg = None
 
-            # Open in browser
-            webbrowser.open(url)
+            try:
+                url = self.item.content
+                # Ensure URL has proper protocol
+                if not url.startswith(('http://', 'https://')):
+                    if url.startswith('www.'):
+                        url = 'https://' + url
+                    else:
+                        url = 'https://' + url
 
-            # Update button style briefly to show it was clicked
-            original_style = self.open_url_button.styleSheet()
-            self.open_url_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #00ff00;
-                    color: #ffffff;
-                    border: none;
-                    border-radius: 4px;
-                    font-size: 16pt;
-                }
-            """)
-            QTimer.singleShot(300, lambda: self.open_url_button.setStyleSheet(original_style))
+                # Open in browser
+                webbrowser.open(url)
+                success = True
+
+                # Update button style briefly to show it was clicked
+                original_style = self.open_url_button.styleSheet()
+                self.open_url_button.setStyleSheet("""
+                    QPushButton {
+                        background-color: #00ff00;
+                        color: #ffffff;
+                        border: none;
+                        border-radius: 4px;
+                        font-size: 16pt;
+                    }
+                """)
+                QTimer.singleShot(300, lambda: self.open_url_button.setStyleSheet(original_style))
+
+            except Exception as e:
+                logger.error(f"Error opening URL {self.item.label}: {e}")
+                error_msg = str(e)
+
+            finally:
+                # Track execution end
+                self.usage_tracker.track_execution_end(self.item.id, start_time, success, error_msg)
 
     def open_in_explorer(self):
         """Open file/folder in system file explorer"""
         if self.item.type == ItemType.PATH:
-            path = Path(self.item.content)
+            # Track execution start
+            start_time = self.usage_tracker.track_execution_start(self.item.id)
+            success = False
+            error_msg = None
 
             try:
+                path = Path(self.item.content)
                 system = platform.system()
 
                 if system == 'Windows':
@@ -300,6 +396,8 @@ class ItemButton(QFrame):
                         if parent.exists():
                             subprocess.run(['xdg-open', str(parent.absolute())])
 
+                success = True
+
                 # Visual feedback
                 original_style = self.open_explorer_button.styleSheet()
                 self.open_explorer_button.setStyleSheet("""
@@ -314,7 +412,12 @@ class ItemButton(QFrame):
                 QTimer.singleShot(300, lambda: self.open_explorer_button.setStyleSheet(original_style))
 
             except Exception as e:
-                print(f"Error opening explorer: {e}")
+                logger.error(f"Error opening explorer for {self.item.label}: {e}")
+                error_msg = str(e)
+
+            finally:
+                # Track execution end
+                self.usage_tracker.track_execution_end(self.item.id, start_time, success, error_msg)
 
     def open_file(self):
         """Open file with default application"""
@@ -498,3 +601,100 @@ class ItemButton(QFrame):
             pyperclip.copy("")  # Clear clipboard
         except Exception as e:
             print(f"Error clearing clipboard: {e}")
+
+    def update_favorite_button(self):
+        """Actualizar icono del botón de favorito"""
+        is_fav = self.favorites_manager.is_favorite(self.item.id)
+
+        if is_fav:
+            self.favorite_btn.setText("⭐")
+            self.favorite_btn.setToolTip("Quitar de favoritos")
+        else:
+            self.favorite_btn.setText("☆")
+            self.favorite_btn.setToolTip("Marcar como favorito")
+
+    def toggle_favorite(self):
+        """Alternar estado de favorito"""
+        try:
+            is_fav = self.favorites_manager.toggle_favorite(self.item.id)
+
+            # Actualizar botón
+            self.update_favorite_button()
+
+            # Emitir señal
+            self.favorite_toggled.emit(self.item.id, is_fav)
+
+            # Log
+            msg = "agregado a" if is_fav else "quitado de"
+            logger.info(f"Item '{self.item.label}' {msg} favoritos")
+
+        except Exception as e:
+            logger.error(f"Error toggling favorite for item {self.item.id}: {e}")
+
+    def get_badge(self) -> str:
+        """Obtener badge del item (🔥 Popular o 🆕 Nuevo)"""
+        use_count = getattr(self.item, 'use_count', 0)
+
+        # Popular: más de 50 usos
+        if use_count > 50:
+            return "🔥"
+
+        # Nuevo: 0 usos
+        if use_count == 0:
+            return "🆕"
+
+        return ""
+
+    def get_usage_stats(self) -> str:
+        """Obtener estadísticas de uso (use_count + last_used)"""
+        use_count = getattr(self.item, 'use_count', 0)
+        last_used = getattr(self.item, 'last_used', None)
+
+        parts = []
+
+        # Use count
+        if use_count > 0:
+            parts.append(f"{use_count} usos")
+        else:
+            parts.append("Sin usar")
+
+        # Last used
+        if last_used:
+            from datetime import datetime
+            try:
+                # Parse SQLite datetime format: YYYY-MM-DD HH:MM:SS
+                # Si ya es datetime, usarlo directamente
+                if isinstance(last_used, datetime):
+                    last_used_dt = last_used
+                else:
+                    last_used_dt = datetime.strptime(str(last_used), "%Y-%m-%d %H:%M:%S")
+
+                now = datetime.now()
+                diff = now - last_used_dt
+
+                # Format relative time
+                if diff.days == 0:
+                    if diff.seconds < 60:
+                        time_str = "hace unos segundos"
+                    elif diff.seconds < 3600:
+                        minutes = diff.seconds // 60
+                        time_str = f"hace {minutes} min"
+                    else:
+                        hours = diff.seconds // 3600
+                        time_str = f"hace {hours}h"
+                elif diff.days == 1:
+                    time_str = "ayer"
+                elif diff.days < 7:
+                    time_str = f"hace {diff.days} días"
+                elif diff.days < 30:
+                    weeks = diff.days // 7
+                    time_str = f"hace {weeks} semanas"
+                else:
+                    months = diff.days // 30
+                    time_str = f"hace {months} meses"
+
+                parts.append(f"último: {time_str}")
+            except Exception as e:
+                logger.debug(f"Error parsing last_used date: {e}")
+
+        return " | ".join(parts) if parts else ""

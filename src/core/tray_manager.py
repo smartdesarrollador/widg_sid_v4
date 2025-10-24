@@ -19,6 +19,9 @@ class TrayManager(QObject):
     show_window_requested = pyqtSignal()
     hide_window_requested = pyqtSignal()
     settings_requested = pyqtSignal()
+    stats_dashboard_requested = pyqtSignal()
+    popular_items_requested = pyqtSignal()
+    forgotten_items_requested = pyqtSignal()
     logout_requested = pyqtSignal()
     quit_requested = pyqtSignal()
 
@@ -88,9 +91,27 @@ class TrayManager(QObject):
         self.tray_menu.addSeparator()
 
         # Settings action
-        settings_action = QAction("Configuración", self.tray_menu)
+        settings_action = QAction("⚙ Configuración", self.tray_menu)
         settings_action.triggered.connect(self._on_settings)
         self.tray_menu.addAction(settings_action)
+
+        # Separator
+        self.tray_menu.addSeparator()
+
+        # Stats dashboard action
+        dashboard_action = QAction("📊 Dashboard de Estadísticas", self.tray_menu)
+        dashboard_action.triggered.connect(self._on_stats_dashboard)
+        self.tray_menu.addAction(dashboard_action)
+
+        # Popular items action
+        popular_action = QAction("🔥 Items Populares", self.tray_menu)
+        popular_action.triggered.connect(self._on_popular_items)
+        self.tray_menu.addAction(popular_action)
+
+        # Forgotten items action
+        forgotten_action = QAction("📦 Items Olvidados", self.tray_menu)
+        forgotten_action.triggered.connect(self._on_forgotten_items)
+        self.tray_menu.addAction(forgotten_action)
 
         # Separator
         self.tray_menu.addSeparator()
@@ -137,6 +158,18 @@ class TrayManager(QObject):
     def _on_settings(self):
         """Handle settings menu action"""
         self.settings_requested.emit()
+
+    def _on_stats_dashboard(self):
+        """Handle stats dashboard menu action"""
+        self.stats_dashboard_requested.emit()
+
+    def _on_popular_items(self):
+        """Handle popular items menu action"""
+        self.popular_items_requested.emit()
+
+    def _on_forgotten_items(self):
+        """Handle forgotten items menu action"""
+        self.forgotten_items_requested.emit()
 
     def _on_logout(self):
         """Handle logout menu action"""

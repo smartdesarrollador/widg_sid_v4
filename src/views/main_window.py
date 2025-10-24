@@ -12,11 +12,18 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from views.sidebar import Sidebar
 from views.floating_panel import FloatingPanel
+from views.favorites_floating_panel import FavoritesFloatingPanel
+from views.stats_floating_panel import StatsFloatingPanel
 from views.settings_window import SettingsWindow
+from views.dialogs.popular_items_dialog import PopularItemsDialog
+from views.dialogs.forgotten_items_dialog import ForgottenItemsDialog
+from views.dialogs.suggestions_dialog import FavoriteSuggestionsDialog
+from views.dialogs.stats_dashboard import StatsDashboard
 from models.item import Item
 from core.hotkey_manager import HotkeyManager
 from core.tray_manager import TrayManager
 from core.session_manager import SessionManager
+from core.notification_manager import NotificationManager
 
 # Get logger
 logger = logging.getLogger(__name__)
@@ -35,15 +42,19 @@ class MainWindow(QMainWindow):
         self.config_manager = controller.config_manager if controller else None
         self.sidebar = None
         self.floating_panel = None  # Ventana flotante para items
+        self.favorites_panel = None  # Ventana flotante para favoritos
+        self.stats_panel = None  # Ventana flotante para estadísticas
         self.current_category_id = None  # Para el toggle
         self.hotkey_manager = None
         self.tray_manager = None
+        self.notification_manager = NotificationManager()
         self.is_visible = True
 
         self.init_ui()
         self.position_window()
         self.setup_hotkeys()
         self.setup_tray()
+        self.check_notifications_delayed()
 
     def init_ui(self):
         """Initialize the user interface"""
@@ -142,6 +153,8 @@ class MainWindow(QMainWindow):
         # Create sidebar only (no embedded panel)
         self.sidebar = Sidebar()
         self.sidebar.category_clicked.connect(self.on_category_clicked)
+        self.sidebar.favorites_clicked.connect(self.on_favorites_clicked)
+        self.sidebar.stats_clicked.connect(self.on_stats_clicked)
         self.sidebar.settings_clicked.connect(self.open_settings)
         main_layout.addWidget(self.sidebar)
 
@@ -209,6 +222,103 @@ class MainWindow(QMainWindow):
         if self.floating_panel:
             self.floating_panel.deleteLater()
             self.floating_panel = None
+
+    def on_favorites_clicked(self):
+        """Handle favorites button click - show favorites panel"""
+        try:
+            logger.info("Favorites button clicked")
+
+            # Toggle: Si ya está visible, ocultarlo
+            if self.favorites_panel and self.favorites_panel.isVisible():
+                logger.info("Hiding favorites panel")
+                self.favorites_panel.hide()
+                return
+
+            # Crear panel si no existe
+            if not self.favorites_panel:
+                self.favorites_panel = FavoritesFloatingPanel()
+                self.favorites_panel.favorite_executed.connect(self.on_favorite_executed)
+                self.favorites_panel.window_closed.connect(self.on_favorites_panel_closed)
+                logger.debug("Favorites panel created")
+
+            # Posicionar cerca del sidebar
+            self.favorites_panel.position_near_sidebar(self)
+
+            # Mostrar panel
+            self.favorites_panel.show()
+            self.favorites_panel.refresh()
+
+            logger.info("Favorites panel shown")
+
+        except Exception as e:
+            logger.error(f"Error in on_favorites_clicked: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al mostrar favoritos:\n{str(e)}"
+            )
+
+    def on_favorites_panel_closed(self):
+        """Handle favorites panel closed"""
+        logger.info("Favorites panel closed")
+        if self.favorites_panel:
+            self.favorites_panel.deleteLater()
+            self.favorites_panel = None
+
+    def on_favorite_executed(self, item_id: int):
+        """Handle favorite item executed"""
+        try:
+            logger.info(f"Favorite item executed: {item_id}")
+
+            # Buscar el item y ejecutarlo
+            if self.controller:
+                # Aquí deberías tener una forma de obtener el item por ID
+                # Por ahora solo hacemos log
+                logger.info(f"Executing favorite item {item_id}")
+
+        except Exception as e:
+            logger.error(f"Error executing favorite: {e}", exc_info=True)
+
+    def on_stats_clicked(self):
+        """Handle stats button click - show stats panel"""
+        try:
+            logger.info("Stats button clicked")
+
+            # Toggle: Si ya está visible, ocultarlo
+            if self.stats_panel and self.stats_panel.isVisible():
+                logger.info("Hiding stats panel")
+                self.stats_panel.hide()
+                return
+
+            # Crear panel si no existe
+            if not self.stats_panel:
+                self.stats_panel = StatsFloatingPanel()
+                self.stats_panel.window_closed.connect(self.on_stats_panel_closed)
+                logger.debug("Stats panel created")
+
+            # Posicionar cerca del sidebar
+            self.stats_panel.position_near_sidebar(self)
+
+            # Mostrar panel
+            self.stats_panel.show()
+            self.stats_panel.refresh()
+
+            logger.info("Stats panel shown")
+
+        except Exception as e:
+            logger.error(f"Error in on_stats_clicked: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al mostrar estadísticas:\n{str(e)}"
+            )
+
+    def on_stats_panel_closed(self):
+        """Handle stats panel closed"""
+        logger.info("Stats panel closed")
+        if self.stats_panel:
+            self.stats_panel.deleteLater()
+            self.stats_panel = None
 
     def on_item_clicked(self, item: Item):
         """Handle item button click"""
@@ -279,6 +389,9 @@ class MainWindow(QMainWindow):
         self.tray_manager.show_window_requested.connect(self.show_window)
         self.tray_manager.hide_window_requested.connect(self.hide_window)
         self.tray_manager.settings_requested.connect(self.show_settings)
+        self.tray_manager.stats_dashboard_requested.connect(self.show_stats_dashboard)
+        self.tray_manager.popular_items_requested.connect(self.show_popular_items)
+        self.tray_manager.forgotten_items_requested.connect(self.show_forgotten_items)
         self.tray_manager.logout_requested.connect(self.logout_session)
         self.tray_manager.quit_requested.connect(self.quit_application)
 
@@ -394,6 +507,139 @@ class MainWindow(QMainWindow):
         # Exit application
         from PyQt6.QtWidgets import QApplication
         QApplication.quit()
+
+    def check_notifications_delayed(self):
+        """Verificar notificaciones 10 segundos después de abrir"""
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(10000, self.check_notifications)  # 10 segundos
+
+    def check_notifications(self):
+        """Verificar y mostrar notificaciones pendientes"""
+        try:
+            notifications = self.notification_manager.get_pending_notifications()
+
+            if not notifications:
+                logger.info("No pending notifications")
+                return
+
+            # Mostrar solo las 2 primeras notificaciones (no saturar)
+            priority_notifications = notifications[:2]
+
+            logger.info(f"Found {len(notifications)} notifications, showing {len(priority_notifications)}")
+
+            # Por ahora, solo mostramos un diálogo simple con la primera notificación de alta prioridad
+            for notification in priority_notifications:
+                if notification.get('priority') == 'high':
+                    self.show_notification_message(notification)
+                    break
+
+        except Exception as e:
+            logger.error(f"Error checking notifications: {e}")
+
+    def show_notification_message(self, notification: dict):
+        """Mostrar mensaje de notificación"""
+        title = notification.get('title', 'Notificación')
+        message = notification.get('message', '')
+        action = notification.get('action', '')
+
+        reply = QMessageBox.question(
+            self,
+            title,
+            f"{message}\n\n¿Deseas verlo ahora?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            self.handle_notification_action(action)
+
+    def handle_notification_action(self, action: str):
+        """Manejar acción de notificación"""
+        try:
+            if action == 'show_favorite_suggestions':
+                self.show_favorite_suggestions()
+
+            elif action == 'show_cleanup_suggestions':
+                self.show_forgotten_items()
+
+            elif action == 'show_abandoned_items':
+                self.show_forgotten_items()
+
+            elif action == 'show_failing_items':
+                # TODO: Crear diálogo específico para items con errores
+                QMessageBox.information(
+                    self,
+                    "Items con Errores",
+                    "Funcionalidad en desarrollo"
+                )
+
+            elif action == 'show_slow_items':
+                # TODO: Crear diálogo específico para items lentos
+                QMessageBox.information(
+                    self,
+                    "Items Lentos",
+                    "Funcionalidad en desarrollo"
+                )
+
+            elif action == 'show_shortcut_suggestions':
+                # TODO: Crear diálogo para asignar atajos
+                QMessageBox.information(
+                    self,
+                    "Sugerencias de Atajos",
+                    "Funcionalidad en desarrollo"
+                )
+
+        except Exception as e:
+            logger.error(f"Error handling notification action '{action}': {e}")
+
+    def show_popular_items(self):
+        """Mostrar diálogo de items populares"""
+        try:
+            dialog = PopularItemsDialog(self)
+            dialog.item_selected.connect(self.on_popular_item_selected)
+            dialog.exec()
+        except Exception as e:
+            logger.error(f"Error showing popular items: {e}")
+            QMessageBox.critical(self, "Error", f"Error al mostrar items populares:\n{str(e)}")
+
+    def show_forgotten_items(self):
+        """Mostrar diálogo de items olvidados"""
+        try:
+            dialog = ForgottenItemsDialog(self)
+            if dialog.exec():
+                # Recargar categorías si se eliminaron items
+                if self.controller:
+                    categories = self.controller.get_categories()
+                    self.sidebar.load_categories(categories)
+        except Exception as e:
+            logger.error(f"Error showing forgotten items: {e}")
+            QMessageBox.critical(self, "Error", f"Error al mostrar items olvidados:\n{str(e)}")
+
+    def show_stats_dashboard(self):
+        """Mostrar dashboard completo de estadísticas"""
+        try:
+            dialog = StatsDashboard(self)
+            dialog.exec()
+        except Exception as e:
+            logger.error(f"Error showing stats dashboard: {e}")
+            QMessageBox.critical(self, "Error", f"Error al mostrar dashboard de estadísticas:\n{str(e)}")
+
+    def show_favorite_suggestions(self):
+        """Mostrar diálogo de sugerencias de favoritos"""
+        try:
+            dialog = FavoriteSuggestionsDialog(self)
+            if dialog.exec():
+                # Refrescar panel de favoritos si existe
+                if self.favorites_panel:
+                    self.favorites_panel.refresh()
+        except Exception as e:
+            logger.error(f"Error showing favorite suggestions: {e}")
+            QMessageBox.critical(self, "Error", f"Error al mostrar sugerencias:\n{str(e)}")
+
+    def on_popular_item_selected(self, item_id: int):
+        """Handler cuando se selecciona un item popular"""
+        logger.info(f"Popular item selected: {item_id}")
+        # TODO: Abrir el item o mostrarlo en la lista principal
 
     def closeEvent(self, event):
         """Override close event to minimize to tray instead of closing"""

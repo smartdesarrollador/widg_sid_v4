@@ -22,6 +22,12 @@ class Sidebar(QWidget):
     # Signal emitted when settings button is clicked
     settings_clicked = pyqtSignal()
 
+    # Signal emitted when favorites button is clicked
+    favorites_clicked = pyqtSignal()
+
+    # Signal emitted when stats button is clicked
+    stats_clicked = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.category_buttons = {}
@@ -146,6 +152,56 @@ class Sidebar(QWidget):
         self.scroll_down_button.clicked.connect(self.scroll_down)
         main_layout.addWidget(self.scroll_down_button)
 
+        # Favorites button
+        self.favorites_button = QPushButton("⭐")
+        self.favorites_button.setFixedSize(70, 60)
+        self.favorites_button.setToolTip("Favoritos")
+        self.favorites_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.favorites_button.setStyleSheet("""
+            QPushButton {
+                background-color: #252525;
+                color: #cccccc;
+                border: none;
+                border-top: 1px solid #1e1e1e;
+                font-size: 20pt;
+            }
+            QPushButton:hover {
+                background-color: #3d3d3d;
+                color: #F39C12;
+            }
+            QPushButton:pressed {
+                background-color: #F39C12;
+                color: #ffffff;
+            }
+        """)
+        self.favorites_button.clicked.connect(self.on_favorites_clicked)
+        main_layout.addWidget(self.favorites_button)
+
+        # Stats button
+        self.stats_button = QPushButton("📊")
+        self.stats_button.setFixedSize(70, 60)
+        self.stats_button.setToolTip("Estadísticas")
+        self.stats_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.stats_button.setStyleSheet("""
+            QPushButton {
+                background-color: #252525;
+                color: #cccccc;
+                border: none;
+                border-top: 1px solid #1e1e1e;
+                font-size: 20pt;
+            }
+            QPushButton:hover {
+                background-color: #3d3d3d;
+                color: #4EC9B0;
+            }
+            QPushButton:pressed {
+                background-color: #4EC9B0;
+                color: #ffffff;
+            }
+        """)
+        self.stats_button.clicked.connect(self.on_stats_clicked)
+        main_layout.addWidget(self.stats_button)
+
         # Settings button at the bottom
         self.settings_button = QPushButton("⚙")
         self.settings_button.setFixedSize(70, 60)
@@ -269,6 +325,14 @@ class Sidebar(QWidget):
         if button:
             button.set_active(True)
             self.active_button = button
+
+    def on_favorites_clicked(self):
+        """Handle favorites button click"""
+        self.favorites_clicked.emit()
+
+    def on_stats_clicked(self):
+        """Handle stats button click"""
+        self.stats_clicked.emit()
 
     def on_settings_clicked(self):
         """Handle settings button click"""
