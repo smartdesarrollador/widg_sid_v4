@@ -2,8 +2,8 @@
 Stats Floating Panel - Panel flotante para mostrar estadísticas
 """
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, pyqtSignal, QEvent
+from PyQt6.QtGui import QFont, QCursor
 import sys
 import logging
 from pathlib import Path
@@ -22,6 +22,13 @@ class StatsFloatingPanel(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+
+        # Resize handling
+        self.resizing = False
+        self.resize_start_x = 0
+        self.resize_start_width = 0
+        self.resize_edge_width = 15
+
         self.init_ui()
 
     def init_ui(self):
@@ -35,8 +42,13 @@ class StatsFloatingPanel(QWidget):
         )
 
         # Tamaño
-        self.setFixedSize(280, 350)
+        self.setMinimumWidth(250)
+        self.setMaximumWidth(500)
+        self.setFixedHeight(350)
+        self.resize(280, 350)
         self.setWindowOpacity(0.95)
+        self.setMouseTracking(True)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
 
         # Layout principal
         main_layout = QVBoxLayout(self)
@@ -129,14 +141,64 @@ class StatsFloatingPanel(QWidget):
         self.window_closed.emit()
         super().closeEvent(event)
 
+    def is_on_left_edge(self, pos):
+        """Check if mouse position is on the left edge for resizing"""
+        return pos.x() <= self.resize_edge_width
+
+    def event(self, event):
+        """Override event to handle hover for cursor changes"""
+        if event.type() == QEvent.Type.HoverMove:
+            pos = event.position().toPoint()
+            if self.is_on_left_edge(pos):
+                self.setCursor(QCursor(Qt.CursorShape.SizeHorCursor))
+            else:
+                self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+        return super().event(event)
+
     def mousePressEvent(self, event):
-        """Handler para poder mover la ventana"""
+        """Handler para poder mover la ventana o redimensionarla"""
         if event.button() == Qt.MouseButton.LeftButton:
-            self.drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
-            event.accept()
+            if self.is_on_left_edge(event.pos()):
+                # Start resizing
+                self.resizing = True
+                self.resize_start_x = event.globalPosition().toPoint().x()
+                self.resize_start_width = self.width()
+                event.accept()
+            else:
+                # Start dragging
+                self.drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                event.accept()
 
     def mouseMoveEvent(self, event):
-        """Handler para mover la ventana"""
+        """Handler para mover o redimensionar la ventana"""
         if event.buttons() == Qt.MouseButton.LeftButton:
-            self.move(event.globalPosition().toPoint() - self.drag_position)
-            event.accept()
+            if self.resizing:
+                # Calculate new width
+                current_x = event.globalPosition().toPoint().x()
+                delta_x = current_x - self.resize_start_x
+                new_width = self.resize_start_width - delta_x
+
+                # Apply constraints
+                new_width = max(self.minimumWidth(), min(new_width, self.maximumWidth()))
+
+                # Resize and reposition
+                old_width = self.width()
+                old_x = self.x()
+                self.resize(new_width, self.height())
+
+                # Adjust position to keep right edge fixed
+                width_diff = self.width() - old_width
+                self.move(old_x - width_diff, self.y())
+
+                event.accept()
+            else:
+                # Dragging
+                self.move(event.globalPosition().toPoint() - self.drag_position)
+                event.accept()
+
+    def mouseReleaseEvent(self, event):
+        """Handle mouse release to end resizing"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            if self.resizing:
+                self.resizing = False
+                event.accept()

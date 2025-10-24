@@ -2,8 +2,8 @@
 Floating Panel Window - Independent window for displaying category items
 """
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QScrollArea
-from PyQt6.QtCore import Qt, pyqtSignal, QPoint
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QEvent
+from PyQt6.QtGui import QFont, QCursor
 import sys
 import logging
 from pathlib import Path
@@ -41,6 +41,12 @@ class FloatingPanel(QWidget):
         else:
             self.panel_width = 500
 
+        # Resize handling
+        self.resizing = False
+        self.resize_start_x = 0
+        self.resize_start_width = 0
+        self.resize_edge_width = 15  # Width of the resize edge in pixels (increased)
+
         self.init_ui()
 
     def init_ui(self):
@@ -62,19 +68,25 @@ class FloatingPanel(QWidget):
         else:
             window_height = 600  # Fallback
 
-        # Set window size
-        self.setFixedWidth(self.panel_width)
+        # Set window size (allow width to be resized)
+        self.setMinimumWidth(300)  # Minimum width
+        self.setMaximumWidth(1000)  # Maximum width
         self.setMinimumHeight(400)
         self.resize(self.panel_width, window_height)
+
+        # Enable mouse tracking for resize cursor
+        self.setMouseTracking(True)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
 
         # Set window opacity
         self.setWindowOpacity(0.95)
 
         # Set background
         self.setStyleSheet("""
-            QWidget {
+            FloatingPanel {
                 background-color: #252525;
                 border: 2px solid #007acc;
+                border-left: 5px solid #007acc;
                 border-radius: 8px;
             }
         """)
@@ -221,17 +233,70 @@ class FloatingPanel(QWidget):
         self.move(panel_x, panel_y)
         logger.debug(f"Positioned floating panel at ({panel_x}, {panel_y})")
 
+    def is_on_left_edge(self, pos):
+        """Check if mouse position is on the left edge for resizing"""
+        return pos.x() <= self.resize_edge_width
+
+    def event(self, event):
+        """Override event to handle hover for cursor changes"""
+        if event.type() == QEvent.Type.HoverMove:
+            pos = event.position().toPoint()
+            if self.is_on_left_edge(pos):
+                self.setCursor(QCursor(Qt.CursorShape.SizeHorCursor))
+            else:
+                self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+        return super().event(event)
+
     def mousePressEvent(self, event):
-        """Handle mouse press for dragging"""
+        """Handle mouse press for dragging or resizing"""
         if event.button() == Qt.MouseButton.LeftButton:
-            self.drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
-            event.accept()
+            if self.is_on_left_edge(event.pos()):
+                # Start resizing
+                self.resizing = True
+                self.resize_start_x = event.globalPosition().toPoint().x()
+                self.resize_start_width = self.width()
+                event.accept()
+            else:
+                # Start dragging
+                self.drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                event.accept()
 
     def mouseMoveEvent(self, event):
-        """Handle mouse move for dragging"""
+        """Handle mouse move for dragging or resizing"""
         if event.buttons() == Qt.MouseButton.LeftButton:
-            self.move(event.globalPosition().toPoint() - self.drag_position)
-            event.accept()
+            if self.resizing:
+                # Calculate new width
+                current_x = event.globalPosition().toPoint().x()
+                delta_x = current_x - self.resize_start_x
+                new_width = self.resize_start_width - delta_x  # Subtract because we're dragging from left edge
+
+                # Apply constraints
+                new_width = max(self.minimumWidth(), min(new_width, self.maximumWidth()))
+
+                # Resize and reposition
+                old_width = self.width()
+                old_x = self.x()
+                self.resize(new_width, self.height())
+
+                # Adjust position to keep right edge fixed
+                width_diff = self.width() - old_width
+                self.move(old_x - width_diff, self.y())
+
+                event.accept()
+            else:
+                # Dragging
+                self.move(event.globalPosition().toPoint() - self.drag_position)
+                event.accept()
+
+    def mouseReleaseEvent(self, event):
+        """Handle mouse release to end resizing"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            if self.resizing:
+                self.resizing = False
+                # Save new width to config
+                if self.config_manager:
+                    self.config_manager.set_setting('panel_width', self.width())
+                event.accept()
 
     def closeEvent(self, event):
         """Handle window close event"""
