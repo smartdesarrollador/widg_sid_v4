@@ -49,8 +49,12 @@ class ItemButton(QFrame):
         """Initialize button UI"""
         # Set frame properties
         self.setMinimumHeight(50)
-        self.setMaximumHeight(80)
+        # Remove maximum height to allow widget to grow with content
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setSizePolicy(
+            self.sizePolicy().horizontalPolicy(),
+            self.sizePolicy().Policy.MinimumExpanding
+        )
 
         # Set tooltip with description if available
         if hasattr(self.item, 'description') and self.item.description:
@@ -75,6 +79,12 @@ class ItemButton(QFrame):
         label_font = QFont()
         label_font.setPointSize(10)
         self.label_widget.setFont(label_font)
+        # Enable word wrap to allow multiple lines
+        self.label_widget.setWordWrap(True)
+        self.label_widget.setSizePolicy(
+            self.label_widget.sizePolicy().Policy.Expanding,
+            self.label_widget.sizePolicy().Policy.Minimum
+        )
         label_row.addWidget(self.label_widget)
 
         # Badge (Popular / Nuevo)
@@ -129,6 +139,11 @@ class ItemButton(QFrame):
                     border: none;
                 }
             """)
+            stats_label.setWordWrap(True)
+            stats_label.setSizePolicy(
+                stats_label.sizePolicy().Policy.Expanding,
+                stats_label.sizePolicy().Policy.Minimum
+            )
             left_layout.addWidget(stats_label)
 
         main_layout.addLayout(left_layout, 1)
