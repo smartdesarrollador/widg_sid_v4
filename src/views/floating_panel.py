@@ -1,7 +1,7 @@
 """
 Floating Panel Window - Independent window for displaying category items
 """
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QScrollArea
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QPushButton
 from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QEvent
 from PyQt6.QtGui import QFont, QCursor
 import sys
@@ -96,20 +96,57 @@ class FloatingPanel(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Header with category name
-        self.header_label = QLabel("Select a category")
-        self.header_label.setStyleSheet("""
-            QLabel {
+        # Header with category name and close button
+        header_widget = QWidget()
+        header_widget.setStyleSheet("""
+            QWidget {
                 background-color: #007acc;
-                color: #ffffff;
-                padding: 15px;
-                font-size: 12pt;
-                font-weight: bold;
                 border-radius: 6px 6px 0 0;
             }
         """)
+        header_layout = QHBoxLayout(header_widget)
+        header_layout.setContentsMargins(15, 10, 10, 10)
+        header_layout.setSpacing(5)
+
+        # Category title
+        self.header_label = QLabel("Select a category")
+        self.header_label.setStyleSheet("""
+            QLabel {
+                background-color: transparent;
+                color: #ffffff;
+                font-size: 12pt;
+                font-weight: bold;
+            }
+        """)
         self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(self.header_label)
+        header_layout.addWidget(self.header_label)
+
+        # Close button
+        close_button = QPushButton("✕")
+        close_button.setFixedSize(24, 24)
+        close_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_button.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.1);
+                color: #ffffff;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 12px;
+                font-size: 12pt;
+                font-weight: bold;
+                padding: 0px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.4);
+            }
+            QPushButton:pressed {
+                background-color: rgba(255, 255, 255, 0.3);
+            }
+        """)
+        close_button.clicked.connect(self.hide)
+        header_layout.addWidget(close_button)
+
+        main_layout.addWidget(header_widget)
 
         # Search bar
         self.search_bar = SearchBar()
