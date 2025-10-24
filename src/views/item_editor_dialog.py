@@ -43,7 +43,7 @@ class ItemEditorDialog(QDialog):
         # Window properties
         title = "Editar Item" if self.is_edit_mode else "Nuevo Item"
         self.setWindowTitle(title)
-        self.setFixedSize(450, 450)  # Increased height to accommodate sensitive checkbox
+        self.setFixedSize(450, 500)  # Increased height for description field
         self.setModal(True)
 
         # Apply dark theme
@@ -119,6 +119,11 @@ class ItemEditorDialog(QDialog):
         self.tags_input = QLineEdit()
         self.tags_input.setPlaceholderText("tag1, tag2, tag3 (opcional)")
         form_layout.addRow("Tags:", self.tags_input)
+
+        # Description field (optional)
+        self.description_input = QLineEdit()
+        self.description_input.setPlaceholderText("Descripción del item (opcional)")
+        form_layout.addRow("Descripción:", self.description_input)
 
         # Sensitive checkbox
         self.sensitive_checkbox = QCheckBox("Marcar como sensible (cifrar contenido)")
@@ -201,6 +206,10 @@ class ItemEditorDialog(QDialog):
         # Load tags
         if self.item.tags:
             self.tags_input.setText(", ".join(self.item.tags))
+
+        # Load description
+        if hasattr(self.item, 'description') and self.item.description:
+            self.description_input.setText(self.item.description)
 
         # Load sensitive state
         if hasattr(self.item, 'is_sensitive'):
@@ -312,11 +321,15 @@ class ItemEditorDialog(QDialog):
         tags_text = self.tags_input.text().strip()
         tags = [tag.strip() for tag in tags_text.split(",") if tag.strip()] if tags_text else []
 
+        # Get description
+        description = self.description_input.text().strip() or None
+
         return {
             "label": self.label_input.text().strip(),
             "content": self.content_input.toPlainText().strip(),
             "type": self.type_combo.currentData(),
             "tags": tags,
+            "description": description,
             "is_sensitive": self.sensitive_checkbox.isChecked()
         }
 

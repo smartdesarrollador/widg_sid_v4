@@ -185,7 +185,8 @@ class ConfigManager:
                     item_type=item.type.value.upper(),
                     icon=item.icon,
                     is_sensitive=item.is_sensitive,
-                    tags=item.tags
+                    tags=item.tags,
+                    description=item.description
                 )
 
             # Clear cache
@@ -236,7 +237,8 @@ class ConfigManager:
                     item_type=item.type.value.upper(),
                     icon=item.icon,
                     is_sensitive=item.is_sensitive,
-                    tags=item.tags
+                    tags=item.tags,
+                    description=item.description
                 )
 
             # Clear cache
@@ -479,7 +481,8 @@ class ConfigManager:
             item_type=item_type,
             icon=data.get('icon'),
             is_sensitive=bool(data.get('is_sensitive', False)),
-            tags=data.get('tags', [])
+            tags=data.get('tags', []),
+            description=data.get('description')
         )
         return item
 

@@ -322,7 +322,8 @@ class CategoryEditor(QWidget):
                 content=item_data["content"],
                 item_type=item_data["type"],
                 tags=item_data["tags"],
-                is_sensitive=item_data.get("is_sensitive", False)
+                is_sensitive=item_data.get("is_sensitive", False),
+                description=item_data.get("description")
             )
 
             self.current_category.add_item(new_item)
@@ -350,6 +351,7 @@ class CategoryEditor(QWidget):
             item.type = item_data["type"]
             item.tags = item_data["tags"]
             item.is_sensitive = item_data.get("is_sensitive", False)
+            item.description = item_data.get("description")
 
             self.refresh_items_list()
             self.data_changed.emit()

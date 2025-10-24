@@ -479,7 +479,8 @@ class DBManager:
 
     def add_item(self, category_id: int, label: str, content: str,
                  item_type: str = 'TEXT', icon: str = None,
-                 is_sensitive: bool = False, tags: List[str] = None) -> int:
+                 is_sensitive: bool = False, tags: List[str] = None,
+                 description: str = None) -> int:
         """
         Add new item to category
 
@@ -491,6 +492,7 @@ class DBManager:
             icon: Item icon (optional)
             is_sensitive: Whether content is sensitive (will encrypt content)
             tags: List of tags (optional)
+            description: Item description (optional)
 
         Returns:
             int: New item ID
@@ -505,12 +507,12 @@ class DBManager:
         tags_json = json.dumps(tags or [])
         query = """
             INSERT INTO items
-            (category_id, label, content, type, icon, is_sensitive, tags, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            (category_id, label, content, type, icon, is_sensitive, tags, description, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         """
         item_id = self.execute_update(
             query,
-            (category_id, label, content, item_type, icon, is_sensitive, tags_json)
+            (category_id, label, content, item_type, icon, is_sensitive, tags_json, description)
         )
         logger.info(f"Item added: {label} (ID: {item_id}, Sensitive: {is_sensitive})")
         return item_id
@@ -521,9 +523,9 @@ class DBManager:
 
         Args:
             item_id: Item ID to update
-            **kwargs: Fields to update (label, content, type, icon, is_sensitive, tags)
+            **kwargs: Fields to update (label, content, type, icon, is_sensitive, tags, description)
         """
-        allowed_fields = ['label', 'content', 'type', 'icon', 'is_sensitive', 'tags']
+        allowed_fields = ['label', 'content', 'type', 'icon', 'is_sensitive', 'tags', 'description']
         updates = []
         params = []
 

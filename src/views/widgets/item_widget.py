@@ -52,6 +52,10 @@ class ItemButton(QFrame):
         self.setMaximumHeight(80)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
+        # Set tooltip with description if available
+        if hasattr(self.item, 'description') and self.item.description:
+            self.setToolTip(self.item.description)
+
         # Main layout
         main_layout = QHBoxLayout(self)
         main_layout.setContentsMargins(15, 8, 15, 8)

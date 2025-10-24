@@ -88,3 +88,12 @@ reset_auth.py
 # Backup folders and files
 backup_*/
 backup_widget.py
+
+migrate_db_mejoras.py
+test_fase1_backend.py
+test_stats_button.py
+
+
+
+
+
