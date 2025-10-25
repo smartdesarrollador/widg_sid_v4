@@ -204,6 +204,10 @@ class CategoryEditor(QWidget):
         if not self.controller:
             return
 
+        # Clear cache to force reload from database with all items
+        if hasattr(self.controller, 'config_manager'):
+            self.controller.config_manager._categories_cache = None
+
         self.categories = self.controller.get_categories()
         self.refresh_categories_list()
 
