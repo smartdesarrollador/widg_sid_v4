@@ -25,6 +25,7 @@ class Item:
         item_type: ItemType = ItemType.TEXT,
         icon: Optional[str] = None,
         is_sensitive: bool = False,
+        is_favorite: bool = False,
         tags: Optional[list] = None,
         description: Optional[str] = None
     ):
@@ -34,6 +35,7 @@ class Item:
         self.type = item_type if isinstance(item_type, ItemType) else ItemType(item_type)
         self.icon = icon
         self.is_sensitive = is_sensitive
+        self.is_favorite = is_favorite
         self.tags = tags or []
         self.description = description
         self.created_at = datetime.now()
@@ -62,6 +64,7 @@ class Item:
             "type": self.type.value if isinstance(self.type, ItemType) else self.type,
             "icon": self.icon,
             "is_sensitive": self.is_sensitive,
+            "is_favorite": self.is_favorite,
             "tags": self.tags,
             "description": self.description
         }
@@ -82,6 +85,7 @@ class Item:
             item_type=item_type,
             icon=data.get("icon"),
             is_sensitive=data.get("is_sensitive", False),
+            is_favorite=data.get("is_favorite", False),
             tags=data.get("tags", []),
             description=data.get("description")
         )

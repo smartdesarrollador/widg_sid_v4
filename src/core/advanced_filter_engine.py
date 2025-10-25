@@ -117,10 +117,22 @@ class AdvancedFilterEngine:
         Returns:
             Items filtrados
         """
-        return [
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.debug(f"_filter_by_favorite called with {len(items)} items, is_favorite={is_favorite}")
+
+        filtered = [
             item for item in items
             if hasattr(item, 'is_favorite') and item.is_favorite == is_favorite
         ]
+
+        logger.debug(f"_filter_by_favorite returning {len(filtered)} items")
+        for item in items[:3]:  # Log first 3 items for debugging
+            has_attr = hasattr(item, 'is_favorite')
+            value = getattr(item, 'is_favorite', None) if has_attr else None
+            logger.debug(f"  Item '{item.label}': has_is_favorite={has_attr}, value={value}")
+
+        return filtered
 
     def _filter_by_sensitive(self, items: List[Item], is_sensitive: bool) -> List[Item]:
         """

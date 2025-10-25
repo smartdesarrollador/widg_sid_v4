@@ -13,10 +13,14 @@ from PyQt6.QtGui import QFont, QCursor
 import sys
 import json
 import hashlib
+import logging
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from models.item import ItemType
+
+# Get logger
+logger = logging.getLogger(__name__)
 
 
 class AdvancedFilterPanel(QWidget):
@@ -1269,6 +1273,10 @@ class AdvancedFilterPanel(QWidget):
             filters['type'] = selected_types
 
         # Filtros de estado
+        logger.debug(f"Favorites checkbox checked: {self.favorites_checkbox.isChecked()}")
+        logger.debug(f"Sensitive checkbox checked: {self.sensitive_checkbox.isChecked()}")
+        logger.debug(f"No tags checkbox checked: {self.no_tags_checkbox.isChecked()}")
+
         if self.favorites_checkbox.isChecked():
             filters['is_favorite'] = True
 
@@ -1277,6 +1285,8 @@ class AdvancedFilterPanel(QWidget):
 
         if self.no_tags_checkbox.isChecked():
             filters['has_tags'] = False
+
+        logger.debug(f"Collected filters: {filters}")
 
         # Filtros de uso (Fase 3)
         # Filtro por número de usos
