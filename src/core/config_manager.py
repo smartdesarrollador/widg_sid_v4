@@ -452,9 +452,22 @@ class ConfigManager:
             category_id=str(data['id']),  # Convert to string for compatibility
             name=data['name'],
             icon=data.get('icon', ''),
-            order=data.get('order_index', 0),
-            is_active=bool(data.get('is_active', True))
+            order_index=data.get('order_index', 0),
+            is_active=bool(data.get('is_active', True)),
+            is_predefined=bool(data.get('is_predefined', False)),
+            color=data.get('color'),
+            badge=data.get('badge')
         )
+
+        # Set extended attributes
+        category.item_count = data.get('item_count', 0)
+        category.total_uses = data.get('total_uses', 0)
+        category.last_accessed = data.get('last_accessed')
+        category.access_count = data.get('access_count', 0)
+        category.is_pinned = bool(data.get('is_pinned', False))
+        category.pinned_order = data.get('pinned_order', 0)
+        category.created_at = data.get('created_at')
+        category.updated_at = data.get('updated_at')
         return category
 
     def _dict_to_item(self, data: Dict) -> Item:

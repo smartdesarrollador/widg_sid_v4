@@ -195,6 +195,10 @@ def main():
         window = MainWindow(controller)
         logger.info("MainWindow created")
 
+        # Set controller's main_window reference for bidirectional communication
+        controller.main_window = window
+        logger.info("Controller main_window reference set")
+
         # Load categories into sidebar
         logger.info("Loading categories into UI...")
         categories = controller.get_categories()

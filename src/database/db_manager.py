@@ -110,7 +110,15 @@ class DBManager:
                 is_active BOOLEAN DEFAULT 1,
                 is_predefined BOOLEAN DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                color TEXT,
+                badge TEXT,
+                item_count INTEGER DEFAULT 0,
+                total_uses INTEGER DEFAULT 0,
+                last_accessed TIMESTAMP,
+                access_count INTEGER DEFAULT 0,
+                is_pinned BOOLEAN DEFAULT 0,
+                pinned_order INTEGER DEFAULT 0
             );
 
             -- Tabla de items

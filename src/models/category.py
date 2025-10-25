@@ -13,15 +13,31 @@ class Category:
         category_id: str,
         name: str,
         icon: str = "",
-        order: int = 0,
-        is_active: bool = True
+        order_index: int = 0,
+        is_active: bool = True,
+        is_predefined: bool = False,
+        color: Optional[str] = None,
+        badge: Optional[str] = None
     ):
         self.id = category_id
         self.name = name
         self.icon = icon
-        self.order = order
+        self.order_index = order_index
         self.is_active = is_active
+        self.is_predefined = is_predefined
+        self.color = color
+        self.badge = badge
         self.items: List[Item] = []
+
+        # Atributos extendidos (para filtros avanzados)
+        self.item_count: int = 0
+        self.total_uses: int = 0
+        self.last_accessed: Optional[str] = None
+        self.access_count: int = 0
+        self.is_pinned: bool = False
+        self.pinned_order: int = 0
+        self.created_at: Optional[str] = None
+        self.updated_at: Optional[str] = None
 
     def add_item(self, item: Item) -> None:
         """Add an item to this category"""
@@ -55,8 +71,19 @@ class Category:
             "id": self.id,
             "name": self.name,
             "icon": self.icon,
-            "order": self.order,
+            "order_index": self.order_index,
             "is_active": self.is_active,
+            "is_predefined": self.is_predefined,
+            "color": self.color,
+            "badge": self.badge,
+            "item_count": self.item_count,
+            "total_uses": self.total_uses,
+            "last_accessed": self.last_accessed,
+            "access_count": self.access_count,
+            "is_pinned": self.is_pinned,
+            "pinned_order": self.pinned_order,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
             "items": [item.to_dict() for item in self.items]
         }
 
@@ -67,9 +94,22 @@ class Category:
             category_id=data.get("id", ""),
             name=data.get("name", ""),
             icon=data.get("icon", ""),
-            order=data.get("order", 0),
-            is_active=data.get("is_active", True)
+            order_index=data.get("order_index", data.get("order", 0)),  # Backward compatible
+            is_active=data.get("is_active", True),
+            is_predefined=data.get("is_predefined", False),
+            color=data.get("color"),
+            badge=data.get("badge")
         )
+
+        # Cargar atributos extendidos
+        category.item_count = data.get("item_count", 0)
+        category.total_uses = data.get("total_uses", 0)
+        category.last_accessed = data.get("last_accessed")
+        category.access_count = data.get("access_count", 0)
+        category.is_pinned = data.get("is_pinned", False)
+        category.pinned_order = data.get("pinned_order", 0)
+        category.created_at = data.get("created_at")
+        category.updated_at = data.get("updated_at")
 
         # Load items
         items_data = data.get("items", [])

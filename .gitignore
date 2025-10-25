@@ -93,6 +93,13 @@ migrate_db_mejoras.py
 test_fase1_backend.py
 test_stats_button.py
 
+migrate_category_stats.py
+test_cache_system.py
+test_category_filter_engine.py
+
+
+
+
 
 
 
