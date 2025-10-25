@@ -56,9 +56,30 @@ class ItemButton(QFrame):
             self.sizePolicy().Policy.MinimumExpanding
         )
 
-        # Set tooltip with description if available
+        # Set tooltip with description and content info
+        tooltip_parts = []
+
+        # Add description if available
         if hasattr(self.item, 'description') and self.item.description:
-            self.setToolTip(self.item.description)
+            tooltip_parts.append(self.item.description)
+
+        # Add content preview for non-sensitive items
+        if not self.item.is_sensitive and self.item.content:
+            content_preview = self.item.content[:100]  # First 100 chars
+            if len(self.item.content) > 100:
+                content_preview += "..."
+            if tooltip_parts:  # If there's already a description, add separator
+                tooltip_parts.append("\n---\n")
+            tooltip_parts.append(f"Contenido: {content_preview}")
+
+        # Add item type
+        if tooltip_parts:
+            tooltip_parts.append("\n")
+        tooltip_parts.append(f"Tipo: {self.item.type.value.upper()}")
+
+        # Set the complete tooltip
+        if tooltip_parts:
+            self.setToolTip(''.join(tooltip_parts))
 
         # Main layout
         main_layout = QHBoxLayout(self)
