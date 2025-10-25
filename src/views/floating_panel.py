@@ -13,7 +13,9 @@ from models.category import Category
 from models.item import Item
 from views.widgets.item_widget import ItemButton
 from views.widgets.search_bar import SearchBar
+from views.advanced_filters_window import AdvancedFiltersWindow
 from core.search_engine import SearchEngine
+from core.advanced_filter_engine import AdvancedFilterEngine
 
 # Get logger
 logger = logging.getLogger(__name__)
@@ -33,7 +35,9 @@ class FloatingPanel(QWidget):
         self.current_category = None
         self.config_manager = config_manager
         self.search_engine = SearchEngine()
+        self.filter_engine = AdvancedFilterEngine()  # Motor de filtrado avanzado
         self.all_items = []  # Store all items before filtering
+        self.current_filters = {}  # Filtros activos actuales
 
         # Get panel width from config
         if config_manager:
@@ -148,6 +152,49 @@ class FloatingPanel(QWidget):
 
         main_layout.addWidget(header_widget)
 
+        # Botón para abrir ventana de filtros avanzados
+        filters_button_widget = QWidget()
+        filters_button_widget.setStyleSheet("""
+            QWidget {
+                background-color: #2d2d2d;
+                border-bottom: 1px solid #3d3d3d;
+            }
+        """)
+        filters_button_layout = QHBoxLayout(filters_button_widget)
+        filters_button_layout.setContentsMargins(8, 5, 8, 5)
+        filters_button_layout.setSpacing(0)
+
+        self.open_filters_button = QPushButton("🔍 Filtros Avanzados")
+        self.open_filters_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.open_filters_button.setStyleSheet("""
+            QPushButton {
+                background-color: #007acc;
+                color: #ffffff;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-size: 10pt;
+                font-weight: bold;
+                text-align: left;
+            }
+            QPushButton:hover {
+                background-color: #005a9e;
+            }
+            QPushButton:pressed {
+                background-color: #004578;
+            }
+        """)
+        self.open_filters_button.clicked.connect(self.toggle_filters_window)
+        filters_button_layout.addWidget(self.open_filters_button)
+
+        main_layout.addWidget(filters_button_widget)
+
+        # Crear ventana flotante de filtros (oculta inicialmente)
+        self.filters_window = AdvancedFiltersWindow(self)
+        self.filters_window.filters_changed.connect(self.on_filters_changed)
+        self.filters_window.filters_cleared.connect(self.on_filters_cleared)
+        self.filters_window.hide()
+
         # Search bar
         self.search_bar = SearchBar()
         self.search_bar.search_changed.connect(self.on_search_changed)
@@ -200,6 +247,10 @@ class FloatingPanel(QWidget):
         self.header_label.setText(category.name)
         logger.debug(f"Header updated to: {category.name}")
 
+        # Update available tags in filters window (Fase 4)
+        self.filters_window.update_available_tags(self.all_items)
+        logger.debug(f"Updated available tags from {len(self.all_items)} items")
+
         # Clear search bar
         self.search_bar.clear_search()
 
@@ -248,13 +299,41 @@ class FloatingPanel(QWidget):
         if not self.current_category:
             return
 
-        if not query or not query.strip():
-            # Show all items if query is empty
-            self.display_items(self.all_items)
-        else:
-            # Filter items using search engine
-            filtered_items = self.search_engine.search_in_category(query, self.current_category)
-            self.display_items(filtered_items)
+        # Aplicar filtros avanzados primero
+        filtered_items = self.filter_engine.apply_filters(self.all_items, self.current_filters)
+
+        # Luego aplicar búsqueda si hay query
+        if query and query.strip():
+            # Crear categoría temporal con items filtrados para búsqueda
+            from models.category import Category
+            temp_category = Category(
+                category_id="temp",
+                name="temp",
+                icon=""
+            )
+            # Asignar items después de crear la categoría
+            temp_category.items = filtered_items
+            filtered_items = self.search_engine.search_in_category(query, temp_category)
+
+        self.display_items(filtered_items)
+
+    def on_filters_changed(self, filters: dict):
+        """Handle cuando cambian los filtros avanzados"""
+        logger.info(f"Filters changed: {filters}")
+        self.current_filters = filters
+
+        # Re-aplicar búsqueda y filtros
+        current_query = self.search_bar.search_input.text()
+        self.on_search_changed(current_query)
+
+    def on_filters_cleared(self):
+        """Handle cuando se limpian todos los filtros"""
+        logger.info("All filters cleared")
+        self.current_filters = {}
+
+        # Re-aplicar búsqueda sin filtros
+        current_query = self.search_bar.search_input.text()
+        self.on_search_changed(current_query)
 
     def position_near_sidebar(self, sidebar_window):
         """Position the floating panel near the sidebar window"""
@@ -335,7 +414,22 @@ class FloatingPanel(QWidget):
                     self.config_manager.set_setting('panel_width', self.width())
                 event.accept()
 
+    def toggle_filters_window(self):
+        """Abrir/cerrar la ventana de filtros avanzados"""
+        if self.filters_window.isVisible():
+            self.filters_window.hide()
+        else:
+            # Posicionar cerca del panel flotante
+            self.filters_window.position_near_panel(self)
+            self.filters_window.show()
+            self.filters_window.raise_()
+            self.filters_window.activateWindow()
+
     def closeEvent(self, event):
         """Handle window close event"""
+        # Cerrar también la ventana de filtros si está abierta
+        if self.filters_window.isVisible():
+            self.filters_window.close()
+
         self.window_closed.emit()
         event.accept()
