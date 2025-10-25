@@ -19,6 +19,7 @@ from views.dialogs.popular_items_dialog import PopularItemsDialog
 from views.dialogs.forgotten_items_dialog import ForgottenItemsDialog
 from views.dialogs.suggestions_dialog import FavoriteSuggestionsDialog
 from views.dialogs.stats_dashboard import StatsDashboard
+from views.category_filter_window import CategoryFilterWindow
 from models.item import Item
 from core.hotkey_manager import HotkeyManager
 from core.tray_manager import TrayManager
@@ -44,6 +45,7 @@ class MainWindow(QMainWindow):
         self.floating_panel = None  # Ventana flotante para items
         self.favorites_panel = None  # Ventana flotante para favoritos
         self.stats_panel = None  # Ventana flotante para estadísticas
+        self.category_filter_window = None  # Ventana de filtros de categorías
         self.current_category_id = None  # Para el toggle
         self.hotkey_manager = None
         self.tray_manager = None
@@ -156,6 +158,7 @@ class MainWindow(QMainWindow):
         self.sidebar.favorites_clicked.connect(self.on_favorites_clicked)
         self.sidebar.stats_clicked.connect(self.on_stats_clicked)
         self.sidebar.settings_clicked.connect(self.open_settings)
+        self.sidebar.category_filter_clicked.connect(self.on_category_filter_clicked)
         main_layout.addWidget(self.sidebar)
 
     def load_categories(self, categories):
@@ -319,6 +322,74 @@ class MainWindow(QMainWindow):
         if self.stats_panel:
             self.stats_panel.deleteLater()
             self.stats_panel = None
+
+    def on_category_filter_clicked(self):
+        """Handle category filter button click - show filter window"""
+        try:
+            logger.info("Category filter button clicked")
+
+            # Toggle: Si ya está visible, ocultarlo
+            if self.category_filter_window and self.category_filter_window.isVisible():
+                logger.info("Hiding category filter window")
+                self.category_filter_window.hide()
+                return
+
+            # Crear ventana si no existe
+            if not self.category_filter_window:
+                self.category_filter_window = CategoryFilterWindow(self)
+                self.category_filter_window.filters_changed.connect(self.on_category_filters_changed)
+                self.category_filter_window.filters_cleared.connect(self.on_category_filters_cleared)
+                self.category_filter_window.window_closed.connect(self.on_category_filter_window_closed)
+                logger.debug("Category filter window created")
+
+            # Posicionar a la IZQUIERDA del sidebar
+            sidebar_rect = self.geometry()
+            filter_window_width = self.category_filter_window.width()
+            window_x = sidebar_rect.left() - filter_window_width - 10
+            window_y = sidebar_rect.top()
+            self.category_filter_window.move(window_x, window_y)
+
+            # Mostrar ventana
+            self.category_filter_window.show()
+
+            logger.info("Category filter window shown")
+
+        except Exception as e:
+            logger.error(f"Error in on_category_filter_clicked: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al mostrar filtros de categorías:\n{str(e)}"
+            )
+
+    def on_category_filters_changed(self, filters: dict):
+        """Handle category filters changed"""
+        try:
+            logger.info(f"Category filters changed: {filters}")
+
+            # Aplicar filtros a través del controller
+            if self.controller:
+                self.controller.apply_category_filters(filters)
+
+        except Exception as e:
+            logger.error(f"Error applying category filters: {e}", exc_info=True)
+
+    def on_category_filters_cleared(self):
+        """Handle category filters cleared"""
+        try:
+            logger.info("Category filters cleared")
+
+            # Recargar todas las categorías
+            if self.controller:
+                self.controller.load_all_categories()
+
+        except Exception as e:
+            logger.error(f"Error clearing category filters: {e}", exc_info=True)
+
+    def on_category_filter_window_closed(self):
+        """Handle category filter window closed"""
+        logger.info("Category filter window closed")
+        # No eliminamos la ventana, solo la ocultamos para reutilizarla
 
     def on_item_clicked(self, item: Item):
         """Handle item button click"""

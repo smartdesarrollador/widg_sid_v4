@@ -28,6 +28,9 @@ class Sidebar(QWidget):
     # Signal emitted when stats button is clicked
     stats_clicked = pyqtSignal()
 
+    # Signal emitted when category filter button is clicked
+    category_filter_clicked = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.category_buttons = {}
@@ -99,6 +102,43 @@ class Sidebar(QWidget):
         """)
         self.scroll_up_button.clicked.connect(self.scroll_up)
         main_layout.addWidget(self.scroll_up_button)
+
+        # Category Filter button (FC)
+        self.category_filter_button = QPushButton("FC")
+        self.category_filter_button.setFixedSize(70, 40)
+        self.category_filter_button.setToolTip("Filtro de Categorías")
+        self.category_filter_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.category_filter_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #667eea,
+                    stop:1 #764ba2
+                );
+                color: white;
+                border: none;
+                border-bottom: 1px solid #3d3d3d;
+                font-size: 11pt;
+                font-weight: bold;
+                letter-spacing: 2px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #5568d3,
+                    stop:1 #653a8b
+                );
+            }
+            QPushButton:pressed {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #4457bc,
+                    stop:1 #542974
+                );
+            }
+        """)
+        self.category_filter_button.clicked.connect(self.on_category_filter_clicked)
+        main_layout.addWidget(self.category_filter_button)
 
         # Scroll area for category buttons
         self.scroll_area = QScrollArea()
@@ -337,3 +377,7 @@ class Sidebar(QWidget):
     def on_settings_clicked(self):
         """Handle settings button click"""
         self.settings_clicked.emit()
+
+    def on_category_filter_clicked(self):
+        """Handle category filter button click"""
+        self.category_filter_clicked.emit()

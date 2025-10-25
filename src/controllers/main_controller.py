@@ -8,9 +8,13 @@ from typing import List, Optional
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from core.config_manager import ConfigManager
 from core.clipboard_manager import ClipboardManager
+from core.category_filter_engine import CategoryFilterEngine
 from controllers.clipboard_controller import ClipboardController
 from models.category import Category
 from models.item import Item
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class MainController:
@@ -20,6 +24,7 @@ class MainController:
         # Initialize managers
         self.config_manager = ConfigManager(db_path="widget_sidebar.db")
         self.clipboard_manager = ClipboardManager()
+        self.category_filter_engine = CategoryFilterEngine(db_path="widget_sidebar.db")
 
         # Initialize controllers
         self.clipboard_controller = ClipboardController(self.clipboard_manager)
@@ -27,6 +32,7 @@ class MainController:
         # Data
         self.categories: List[Category] = []
         self.current_category: Optional[Category] = None
+        self.main_window = None  # Will be set by main.py
 
         # Load initial data
         self.load_data()
@@ -79,6 +85,87 @@ class MainController:
     def set_setting(self, key: str, value) -> bool:
         """Set a configuration setting"""
         return self.config_manager.set_setting(key, value)
+
+    def apply_category_filters(self, filters: dict) -> None:
+        """
+        Apply category filters using CategoryFilterEngine
+
+        Args:
+            filters: Dictionary with filter criteria from CategoryFilterWindow
+        """
+        try:
+            logger.info(f"Applying category filters: {filters}")
+
+            # Use CategoryFilterEngine to get filtered categories
+            filtered_categories = self.category_filter_engine.apply_filters(filters)
+
+            logger.info(f"Filter result: {len(filtered_categories)} categories")
+
+            # Update the categories list
+            self.categories = filtered_categories
+
+            # Update the UI (sidebar) if main_window is available
+            if self.main_window:
+                self.main_window.load_categories(filtered_categories)
+                logger.debug("Sidebar updated with filtered categories")
+
+            # Get and log filter stats
+            stats = self.category_filter_engine.get_filter_stats()
+            cache_stats = self.category_filter_engine.get_cache_stats()
+
+            if stats:
+                logger.info(
+                    f"Filter stats: {stats.filtered_categories}/{stats.total_categories} "
+                    f"categories, {stats.active_filters_count} filters, "
+                    f"{stats.execution_time_ms:.2f}ms"
+                )
+
+            if cache_stats:
+                logger.debug(
+                    f"Cache stats: {cache_stats['cache_hits']} hits, "
+                    f"{cache_stats['cache_misses']} misses, "
+                    f"{cache_stats['hit_rate']:.1f}% hit rate, "
+                    f"{cache_stats['cache_size']}/{cache_stats['cache_max_size']} entries"
+                )
+
+        except Exception as e:
+            logger.error(f"Error applying category filters: {e}", exc_info=True)
+            # On error, reload all categories
+            self.load_all_categories()
+
+    def load_all_categories(self) -> None:
+        """
+        Load all categories without filters (clear filters)
+        """
+        try:
+            logger.info("Loading all categories (clearing filters)")
+
+            # Clear filter engine cache (database may have changed)
+            self.category_filter_engine.clear_cache()
+
+            # Reload categories from database
+            self.categories = self.config_manager.load_default_categories()
+
+            logger.info(f"Loaded {len(self.categories)} categories")
+
+            # Update the UI (sidebar) if main_window is available
+            if self.main_window:
+                self.main_window.load_categories(self.categories)
+                logger.debug("Sidebar updated with all categories")
+
+        except Exception as e:
+            logger.error(f"Error loading all categories: {e}", exc_info=True)
+
+    def invalidate_filter_cache(self) -> None:
+        """
+        Invalidate filter engine cache when database changes
+        This should be called after any category/item modifications
+        """
+        logger.debug("Invalidating filter engine cache")
+        self.category_filter_engine.clear_cache()
+        # Also clear config manager cache
+        if hasattr(self.config_manager, '_categories_cache'):
+            self.config_manager._categories_cache = None
 
     def __del__(self):
         """Cleanup: close database connection"""
