@@ -122,6 +122,7 @@ class DBManager:
                 type TEXT CHECK(type IN ('TEXT', 'URL', 'CODE', 'PATH')) DEFAULT 'TEXT',
                 icon TEXT,
                 is_sensitive BOOLEAN DEFAULT 0,
+                is_favorite BOOLEAN DEFAULT 0,
                 tags TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

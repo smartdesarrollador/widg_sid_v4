@@ -4,7 +4,11 @@
       "Bash(git push)",
       "Bash(findstr /N /C:\"class.*Dialog\" \"C:\\Users\\ASUS\\Desktop\\proyectos_python\\widget_sidebar\\src\\views\\settings_window.py\")",
       "Bash(taskkill /F /IM python.exe)",
-      "Bash(findstr /V \"no se encontr\")"
+      "Bash(findstr /V \"no se encontr\")",
+      "Bash(sqlite3 \"C:\\Users\\ASUS\\Desktop\\proyectos_python\\widget_sidebar\\widget_sidebar.db\" \"ALTER TABLE items ADD COLUMN is_favorite BOOLEAN DEFAULT 0;\")",
+      "Bash(python migrate_add_favorite.py)",
+      "Bash(python migrate_favorite_fields.py)",
+      "Bash(python populate_test_data.py)"
     ],
     "deny": [],
     "ask": []
