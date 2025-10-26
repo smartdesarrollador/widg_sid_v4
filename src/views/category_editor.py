@@ -5,7 +5,7 @@ Widget for editing categories and their items
 
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QListWidget, QListWidgetItem,
-    QPushButton, QLabel, QMessageBox, QInputDialog, QDialog
+    QPushButton, QLabel, QMessageBox, QInputDialog, QDialog, QLineEdit
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
@@ -61,6 +61,25 @@ class CategoryEditor(QWidget):
         categories_label = QLabel("Categorías")
         categories_label.setStyleSheet("font-weight: bold; font-size: 11pt;")
         left_layout.addWidget(categories_label)
+
+        # Search box for categories
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("🔍 Buscar categoría...")
+        self.search_input.textChanged.connect(self.filter_categories)
+        self.search_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #2d2d2d;
+                color: #cccccc;
+                border: 1px solid #3d3d3d;
+                border-radius: 4px;
+                padding: 6px;
+                font-size: 9pt;
+            }
+            QLineEdit:focus {
+                border: 1px solid #007acc;
+            }
+        """)
+        left_layout.addWidget(self.search_input)
 
         # Categories list
         self.categories_list = QListWidget()
@@ -222,6 +241,24 @@ class CategoryEditor(QWidget):
             item = QListWidgetItem(f"{category.name} ({len(category.items)})")
             item.setData(Qt.ItemDataRole.UserRole, category)
             self.categories_list.addItem(item)
+
+        # Reapply filter if search text exists
+        if hasattr(self, 'search_input') and self.search_input.text():
+            self.filter_categories(self.search_input.text())
+
+    def filter_categories(self, text):
+        """Filter categories list based on search text"""
+        search_text = text.lower().strip()
+
+        for i in range(self.categories_list.count()):
+            item = self.categories_list.item(i)
+            category = item.data(Qt.ItemDataRole.UserRole)
+
+            # Check if search text matches category name
+            if search_text in category.name.lower():
+                item.setHidden(False)
+            else:
+                item.setHidden(True)
 
     def on_category_selected(self):
         """Handle category selection"""
