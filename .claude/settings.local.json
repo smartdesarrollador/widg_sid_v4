@@ -19,7 +19,9 @@
       "Bash(python test_tags_fix.py:*)",
       "Bash(start python main.py)",
       "Bash(python debug_favorites.py:*)",
-      "Bash(python test_favorite_fix.py:*)"
+      "Bash(python test_favorite_fix.py:*)",
+      "Bash(timeout /t 5)",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": []

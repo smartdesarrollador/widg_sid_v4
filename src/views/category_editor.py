@@ -12,11 +12,14 @@ from PyQt6.QtGui import QFont
 import sys
 from pathlib import Path
 import uuid
+import logging
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from models.category import Category
 from models.item import Item, ItemType
 from views.item_editor_dialog import ItemEditorDialog
+
+logger = logging.getLogger(__name__)
 
 
 class CategoryEditor(QWidget):
@@ -312,7 +315,11 @@ class CategoryEditor(QWidget):
     def add_item(self):
         """Add new item to current category"""
         if not self.current_category:
+            logger.warning("[ADD_ITEM] No current category selected")
             return
+
+        logger.info(f"[ADD_ITEM] Adding item to category: {self.current_category.name} (ID: {self.current_category.id})")
+        logger.info(f"[ADD_ITEM] Current category has {len(self.current_category.items)} items before adding")
 
         dialog = ItemEditorDialog(parent=self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -331,10 +338,22 @@ class CategoryEditor(QWidget):
                 description=item_data.get("description")
             )
 
+            logger.info(f"[ADD_ITEM] Created new item: {new_item.label} (ID: {new_item.id})")
             self.current_category.add_item(new_item)
+            logger.info(f"[ADD_ITEM] Added item to current_category, now has {len(self.current_category.items)} items")
+
+            # Verify if the category in self.categories also has the item
+            for cat in self.categories:
+                if cat.id == self.current_category.id:
+                    logger.info(f"[ADD_ITEM] Found matching category in self.categories, it has {len(cat.items)} items")
+                    logger.info(f"[ADD_ITEM] current_category is same object as in categories: {cat is self.current_category}")
+                    break
+
             self.refresh_items_list()
             self.refresh_categories_list()  # Update count
             self.data_changed.emit()
+        else:
+            logger.info("[ADD_ITEM] Dialog was cancelled")
 
     def edit_item(self):
         """Edit selected item"""
@@ -392,4 +411,9 @@ class CategoryEditor(QWidget):
         Returns:
             List of categories
         """
+        logger.info(f"[GET_CATEGORIES] Returning {len(self.categories)} categories")
+        for i, cat in enumerate(self.categories):
+            logger.info(f"[GET_CATEGORIES]   {i+1}. {cat.name} (ID: {cat.id}) - {len(cat.items)} items")
+            for j, item in enumerate(cat.items):
+                logger.info(f"[GET_CATEGORIES]      Item {j+1}: {item.label}")
         return self.categories

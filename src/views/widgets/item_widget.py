@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from models.item import Item, ItemType
 from core.usage_tracker import UsageTracker
 from core.favorites_manager import FavoritesManager
+from views.command_output_dialog import CommandOutputDialog
 import time
 import logging
 
@@ -229,7 +230,31 @@ class ItemButton(QFrame):
             main_layout.addWidget(self.reveal_button)
 
         # Right side: Action buttons based on item type
-        if self.item.type == ItemType.URL:
+        if self.item.type == ItemType.CODE:
+            # Execute command button (only for CODE items)
+            self.execute_button = QPushButton("⚡")
+            self.execute_button.setFixedSize(35, 35)
+            self.execute_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #cc7a00;
+                    color: #ffffff;
+                    border: none;
+                    border-radius: 4px;
+                    font-size: 16pt;
+                }
+                QPushButton:hover {
+                    background-color: #ff9900;
+                }
+                QPushButton:pressed {
+                    background-color: #9e5e00;
+                }
+            """)
+            self.execute_button.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.execute_button.setToolTip("Ejecutar comando")
+            self.execute_button.clicked.connect(self.execute_command)
+            main_layout.addWidget(self.execute_button)
+
+        elif self.item.type == ItemType.URL:
             # Open URL button (only for URL items)
             self.open_url_button = QPushButton("🌐")
             self.open_url_button.setFixedSize(35, 35)
@@ -754,3 +779,158 @@ class ItemButton(QFrame):
                 logger.debug(f"Error parsing last_used date: {e}")
 
         return " | ".join(parts) if parts else ""
+
+    def execute_command(self):
+        """Ejecutar comando de tipo CODE"""
+        if self.item.type != ItemType.CODE:
+            return
+
+        # Track execution start
+        start_time = self.usage_tracker.track_execution_start(self.item.id)
+        success = False
+        error_msg = None
+
+        try:
+            command = self.item.content.strip()
+
+            # Visual feedback - cambiar botón a amarillo mientras ejecuta
+            original_style = self.execute_button.styleSheet()
+            self.execute_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #ffff00;
+                    color: #000000;
+                    border: none;
+                    border-radius: 4px;
+                    font-size: 16pt;
+                }
+            """)
+            self.execute_button.setText("⏳")
+
+            # Ejecutar comando usando subprocess
+            # En Windows, necesitamos usar shell=True para comandos como 'dir', 'git', etc.
+            system = platform.system()
+
+            if system == 'Windows':
+                # En Windows, usar cmd.exe para ejecutar el comando
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=30  # Timeout de 30 segundos
+                )
+            else:
+                # En Unix-like systems, usar bash
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    executable='/bin/bash'
+                )
+
+            # Obtener output y error
+            stdout = result.stdout if result.stdout else ""
+            stderr = result.stderr if result.stderr else ""
+            return_code = result.returncode
+
+            # Considerar éxito si return code es 0
+            success = (return_code == 0)
+
+            # Restaurar botón
+            self.execute_button.setText("⚡")
+            if success:
+                # Verde si éxito
+                self.execute_button.setStyleSheet("""
+                    QPushButton {
+                        background-color: #00ff00;
+                        color: #000000;
+                        border: none;
+                        border-radius: 4px;
+                        font-size: 16pt;
+                    }
+                """)
+            else:
+                # Rojo si error
+                self.execute_button.setStyleSheet("""
+                    QPushButton {
+                        background-color: #ff0000;
+                        color: #ffffff;
+                        border: none;
+                        border-radius: 4px;
+                        font-size: 16pt;
+                    }
+                """)
+                error_msg = stderr if stderr else "Error desconocido"
+
+            # Restaurar estilo original después de 1 segundo
+            QTimer.singleShot(1000, lambda: self.execute_button.setStyleSheet(original_style))
+
+            # Mostrar dialog con el resultado
+            dialog = CommandOutputDialog(
+                command=command,
+                output=stdout,
+                error=stderr,
+                return_code=return_code,
+                parent=self.window()
+            )
+            dialog.exec()
+
+        except subprocess.TimeoutExpired:
+            logger.error(f"Command timeout: {self.item.label}")
+            error_msg = "Comando excedió el tiempo de espera (30 segundos)"
+
+            # Restaurar botón con estilo de error
+            self.execute_button.setText("⚡")
+            self.execute_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #ff0000;
+                    color: #ffffff;
+                    border: none;
+                    border-radius: 4px;
+                    font-size: 16pt;
+                }
+            """)
+            QTimer.singleShot(1000, lambda: self.execute_button.setStyleSheet(original_style))
+
+            # Mostrar dialog de error
+            dialog = CommandOutputDialog(
+                command=command,
+                output="",
+                error=error_msg,
+                return_code=-1,
+                parent=self.window()
+            )
+            dialog.exec()
+
+        except Exception as e:
+            logger.error(f"Error executing command {self.item.label}: {e}")
+            error_msg = str(e)
+
+            # Restaurar botón con estilo de error
+            self.execute_button.setText("⚡")
+            self.execute_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #ff0000;
+                    color: #ffffff;
+                    border: none;
+                    border-radius: 4px;
+                    font-size: 16pt;
+                }
+            """)
+            QTimer.singleShot(1000, lambda: self.execute_button.setStyleSheet(original_style))
+
+            # Mostrar dialog de error
+            dialog = CommandOutputDialog(
+                command=command if 'command' in locals() else self.item.content,
+                output="",
+                error=error_msg,
+                return_code=-1,
+                parent=self.window()
+            )
+            dialog.exec()
+
+        finally:
+            # Track execution end
+            self.usage_tracker.track_execution_end(self.item.id, start_time, success, error_msg)

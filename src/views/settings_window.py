@@ -173,8 +173,34 @@ class SettingsWindow(QDialog):
     def apply_settings(self):
         """Apply settings without closing dialog"""
         try:
+            # Save current category name to restore selection after reload
+            current_category_name = None
+            if self.category_editor.current_category:
+                current_category_name = self.category_editor.current_category.name
+                logger.info(f"[APPLY] Current category before save: {current_category_name}")
+
             # Save to config
             if self.save_to_config():
+                # Reload categories to sync IDs from database
+                logger.info("[APPLY] Reloading categories from database...")
+                self.category_editor.load_categories()
+                logger.info(f"[APPLY] Loaded {len(self.category_editor.categories)} categories")
+
+                # Restore previous selection by category name
+                if current_category_name:
+                    logger.info(f"[APPLY] Restoring selection for: {current_category_name}")
+                    for i in range(self.category_editor.categories_list.count()):
+                        item = self.category_editor.categories_list.item(i)
+                        category = item.data(Qt.ItemDataRole.UserRole)
+                        if category.name == current_category_name:
+                            logger.info(f"[APPLY] Found category at index {i}, setting as current")
+                            self.category_editor.categories_list.setCurrentItem(item)
+                            # Force update current_category
+                            self.category_editor.current_category = category
+                            logger.info(f"[APPLY] Current category updated, has {len(category.items)} items")
+                            self.category_editor.refresh_items_list()
+                            break
+
                 QMessageBox.information(
                     self,
                     "Aplicar Configuración",
@@ -183,6 +209,7 @@ class SettingsWindow(QDialog):
                 )
                 self.settings_changed.emit()
         except Exception as e:
+            logger.error(f"[APPLY] Error: {e}", exc_info=True)
             QMessageBox.critical(
                 self,
                 "Error",
@@ -197,6 +224,11 @@ class SettingsWindow(QDialog):
 
             if self.save_to_config():
                 logger.info("Settings saved successfully")
+                # Reload categories to sync IDs from database
+                # (This is important for newly created categories)
+                logger.info("Reloading categories to sync with database...")
+                self.category_editor.load_categories()
+                logger.info("Categories reloaded successfully")
                 self.settings_changed.emit()
                 logger.info("Settings changed signal emitted")
                 self.accept()
@@ -284,6 +316,9 @@ class SettingsWindow(QDialog):
                 logger.info("Saving categories to database...")
                 for i, category in enumerate(categories):
                     logger.info(f"Processing category {i+1}/{len(categories)}: '{category.name}' (ID: '{category.id}')")
+                    logger.info(f"  - Category has {len(category.items)} items")
+                    for idx, item in enumerate(category.items):
+                        logger.info(f"    Item {idx+1}: {item.label} (ID: {item.id})")
                     logger.debug(f"  - ID is digit: {category.id.isdigit()}")
                     logger.debug(f"  - ID in existing_ids: {category.id in existing_ids}")
                     logger.debug(f"  - Name in existing_names: {category.name in existing_names}")

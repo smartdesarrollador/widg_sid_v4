@@ -218,7 +218,7 @@ class ConfigManager:
                 category_id=cat_id,
                 name=updated_category.name,
                 icon=updated_category.icon,
-                order_index=updated_category.order,
+                order_index=updated_category.order_index,
                 is_active=updated_category.is_active
             )
 
@@ -246,6 +246,9 @@ class ConfigManager:
             return True
 
         except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error updating category: {e}", exc_info=True)
             print(f"Error updating category: {e}")
             return False
 
@@ -513,7 +516,7 @@ class ConfigManager:
         return {
             'name': category.name,
             'icon': category.icon,
-            'order_index': category.order,
+            'order_index': category.order_index,
             'is_active': category.is_active
         }
 
