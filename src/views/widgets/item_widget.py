@@ -810,6 +810,17 @@ class ItemButton(QFrame):
             # En Windows, necesitamos usar shell=True para comandos como 'dir', 'git', etc.
             system = platform.system()
 
+            # Determinar directorio de trabajo
+            cwd = None
+            if hasattr(self.item, 'working_dir') and self.item.working_dir:
+                from pathlib import Path
+                working_dir_path = Path(self.item.working_dir)
+                if working_dir_path.exists() and working_dir_path.is_dir():
+                    cwd = str(working_dir_path.absolute())
+                    logger.info(f"Executing command in working directory: {cwd}")
+                else:
+                    logger.warning(f"Working directory does not exist: {self.item.working_dir}")
+
             if system == 'Windows':
                 # En Windows, usar cmd.exe para ejecutar el comando
                 result = subprocess.run(
@@ -817,7 +828,8 @@ class ItemButton(QFrame):
                     shell=True,
                     capture_output=True,
                     text=True,
-                    timeout=30  # Timeout de 30 segundos
+                    timeout=30,  # Timeout de 30 segundos
+                    cwd=cwd  # Directorio de trabajo
                 )
             else:
                 # En Unix-like systems, usar bash
@@ -827,7 +839,8 @@ class ItemButton(QFrame):
                     capture_output=True,
                     text=True,
                     timeout=30,
-                    executable='/bin/bash'
+                    executable='/bin/bash',
+                    cwd=cwd  # Directorio de trabajo
                 )
 
             # Obtener output y error

@@ -125,6 +125,23 @@ class ItemEditorDialog(QDialog):
         self.description_input.setPlaceholderText("Descripción del item (opcional)")
         form_layout.addRow("Descripción:", self.description_input)
 
+        # Working directory field (optional, only for CODE items)
+        self.working_dir_label = QLabel("Directorio:")
+        self.working_dir_input = QLineEdit()
+        self.working_dir_input.setPlaceholderText("Ruta donde ejecutar (opcional, ej: C:\\Projects\\myapp)")
+        self.working_dir_input.setToolTip(
+            "Directorio de trabajo donde se ejecutará el comando.\n"
+            "Si está vacío, se ejecuta en el directorio de la aplicación."
+        )
+        form_layout.addRow(self.working_dir_label, self.working_dir_input)
+
+        # Initially hide working dir field (show only for CODE type)
+        self.working_dir_label.hide()
+        self.working_dir_input.hide()
+
+        # Connect type change to show/hide working dir field
+        self.type_combo.currentIndexChanged.connect(self.on_type_changed)
+
         # Sensitive checkbox
         self.sensitive_checkbox = QCheckBox("Marcar como sensible (cifrar contenido)")
         self.sensitive_checkbox.setStyleSheet("""
@@ -188,6 +205,14 @@ class ItemEditorDialog(QDialog):
 
         main_layout.addLayout(buttons_layout)
 
+    def on_type_changed(self):
+        """Handle type combo change - show/hide working dir field"""
+        selected_type = self.type_combo.currentData()
+        is_code = (selected_type == ItemType.CODE)
+
+        self.working_dir_label.setVisible(is_code)
+        self.working_dir_input.setVisible(is_code)
+
     def load_item_data(self):
         """Load existing item data if in edit mode"""
         if not self.is_edit_mode or not self.item:
@@ -211,9 +236,16 @@ class ItemEditorDialog(QDialog):
         if hasattr(self.item, 'description') and self.item.description:
             self.description_input.setText(self.item.description)
 
+        # Load working directory
+        if hasattr(self.item, 'working_dir') and self.item.working_dir:
+            self.working_dir_input.setText(self.item.working_dir)
+
         # Load sensitive state
         if hasattr(self.item, 'is_sensitive'):
             self.sensitive_checkbox.setChecked(self.item.is_sensitive)
+
+        # Update visibility of working dir field
+        self.on_type_changed()
 
     def validate(self) -> bool:
         """
@@ -324,13 +356,19 @@ class ItemEditorDialog(QDialog):
         # Get description
         description = self.description_input.text().strip() or None
 
+        # Get working directory (only if CODE type)
+        working_dir = None
+        if self.type_combo.currentData() == ItemType.CODE:
+            working_dir = self.working_dir_input.text().strip() or None
+
         return {
             "label": self.label_input.text().strip(),
             "content": self.content_input.toPlainText().strip(),
             "type": self.type_combo.currentData(),
             "tags": tags,
             "description": description,
-            "is_sensitive": self.sensitive_checkbox.isChecked()
+            "is_sensitive": self.sensitive_checkbox.isChecked(),
+            "working_dir": working_dir
         }
 
     def on_save(self):

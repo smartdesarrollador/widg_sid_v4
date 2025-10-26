@@ -335,7 +335,8 @@ class CategoryEditor(QWidget):
                 tags=item_data["tags"],
                 is_sensitive=item_data.get("is_sensitive", False),
                 is_favorite=item_data.get("is_favorite", False),
-                description=item_data.get("description")
+                description=item_data.get("description"),
+                working_dir=item_data.get("working_dir")
             )
 
             logger.info(f"[ADD_ITEM] Created new item: {new_item.label} (ID: {new_item.id})")
@@ -376,6 +377,7 @@ class CategoryEditor(QWidget):
             item.tags = item_data["tags"]
             item.is_sensitive = item_data.get("is_sensitive", False)
             item.description = item_data.get("description")
+            item.working_dir = item_data.get("working_dir")
 
             self.refresh_items_list()
             self.data_changed.emit()

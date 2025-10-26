@@ -186,7 +186,8 @@ class ConfigManager:
                     icon=item.icon,
                     is_sensitive=item.is_sensitive,
                     tags=item.tags,
-                    description=item.description
+                    description=item.description,
+                    working_dir=getattr(item, 'working_dir', None)
                 )
 
             # Clear cache
@@ -238,7 +239,8 @@ class ConfigManager:
                     icon=item.icon,
                     is_sensitive=item.is_sensitive,
                     tags=item.tags,
-                    description=item.description
+                    description=item.description,
+                    working_dir=getattr(item, 'working_dir', None)
                 )
 
             # Clear cache
@@ -499,7 +501,8 @@ class ConfigManager:
             is_sensitive=bool(data.get('is_sensitive', False)),
             is_favorite=bool(data.get('is_favorite', False)),
             tags=data.get('tags', []),
-            description=data.get('description')
+            description=data.get('description'),
+            working_dir=data.get('working_dir')
         )
         return item
 

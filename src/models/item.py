@@ -27,7 +27,8 @@ class Item:
         is_sensitive: bool = False,
         is_favorite: bool = False,
         tags: Optional[list] = None,
-        description: Optional[str] = None
+        description: Optional[str] = None,
+        working_dir: Optional[str] = None
     ):
         self.id = item_id
         self.label = label
@@ -38,6 +39,7 @@ class Item:
         self.is_favorite = is_favorite
         self.tags = tags or []
         self.description = description
+        self.working_dir = working_dir  # Directorio de trabajo para ejecutar comandos CODE
         self.created_at = datetime.now()
         self.last_used = datetime.now()
 
@@ -66,7 +68,8 @@ class Item:
             "is_sensitive": self.is_sensitive,
             "is_favorite": self.is_favorite,
             "tags": self.tags,
-            "description": self.description
+            "description": self.description,
+            "working_dir": self.working_dir
         }
 
     @classmethod
@@ -87,7 +90,8 @@ class Item:
             is_sensitive=data.get("is_sensitive", False),
             is_favorite=data.get("is_favorite", False),
             tags=data.get("tags", []),
-            description=data.get("description")
+            description=data.get("description"),
+            working_dir=data.get("working_dir")
         )
 
     def __repr__(self) -> str:
