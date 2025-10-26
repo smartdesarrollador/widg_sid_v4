@@ -436,12 +436,17 @@ class DBManager:
 
         # Parse tags and decrypt sensitive content
         for item in results:
-            # Parse tags from JSON
+            # Parse tags from JSON or CSV format
             if item['tags']:
                 try:
+                    # Try to parse as JSON first
                     item['tags'] = json.loads(item['tags'])
                 except json.JSONDecodeError:
-                    item['tags'] = []
+                    # If JSON parsing fails, try CSV format (legacy)
+                    if isinstance(item['tags'], str):
+                        item['tags'] = [tag.strip() for tag in item['tags'].split(',') if tag.strip()]
+                    else:
+                        item['tags'] = []
             else:
                 item['tags'] = []
 
@@ -470,7 +475,19 @@ class DBManager:
         result = self.execute_query(query, (item_id,))
         if result:
             item = result[0]
-            item['tags'] = json.loads(item['tags']) if item['tags'] else []
+            # Parse tags from JSON or CSV format
+            if item['tags']:
+                try:
+                    # Try to parse as JSON first
+                    item['tags'] = json.loads(item['tags'])
+                except json.JSONDecodeError:
+                    # If JSON parsing fails, try CSV format (legacy)
+                    if isinstance(item['tags'], str):
+                        item['tags'] = [tag.strip() for tag in item['tags'].split(',') if tag.strip()]
+                    else:
+                        item['tags'] = []
+            else:
+                item['tags'] = []
 
             # Decrypt sensitive content
             if item.get('is_sensitive') and item.get('content'):
@@ -624,12 +641,17 @@ class DBManager:
 
         # Parse tags and decrypt sensitive content
         for item in results:
-            # Parse tags from JSON
+            # Parse tags from JSON or CSV format
             if item['tags']:
                 try:
+                    # Try to parse as JSON first
                     item['tags'] = json.loads(item['tags'])
                 except json.JSONDecodeError:
-                    item['tags'] = []
+                    # If JSON parsing fails, try CSV format (legacy)
+                    if isinstance(item['tags'], str):
+                        item['tags'] = [tag.strip() for tag in item['tags'].split(',') if tag.strip()]
+                    else:
+                        item['tags'] = []
             else:
                 item['tags'] = []
 
@@ -673,9 +695,14 @@ class DBManager:
         for item in results:
             if item['tags']:
                 try:
+                    # Try to parse as JSON first
                     item['tags'] = json.loads(item['tags'])
                 except json.JSONDecodeError:
-                    item['tags'] = []
+                    # If JSON parsing fails, try CSV format (legacy)
+                    if isinstance(item['tags'], str):
+                        item['tags'] = [tag.strip() for tag in item['tags'].split(',') if tag.strip()]
+                    else:
+                        item['tags'] = []
             else:
                 item['tags'] = []
 
