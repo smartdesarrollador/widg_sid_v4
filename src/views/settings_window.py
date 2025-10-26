@@ -181,10 +181,10 @@ class SettingsWindow(QDialog):
 
             # Save to config
             if self.save_to_config():
-                # Reload categories to sync IDs from database
-                logger.info("[APPLY] Reloading categories from database...")
-                self.category_editor.load_categories()
-                logger.info(f"[APPLY] Loaded {len(self.category_editor.categories)} categories")
+                # DO NOT reload categories here! This would lose new categories in memory
+                # that haven't been saved yet. Only reload after final save_settings().
+                logger.info("[APPLY] Categories saved successfully (NOT reloading to preserve new categories in memory)")
+                logger.info(f"[APPLY] Current categories in editor: {len(self.category_editor.categories)}")
 
                 # Restore previous selection by category name
                 if current_category_name:
@@ -315,13 +315,18 @@ class SettingsWindow(QDialog):
                 # Save each category to database through config_manager
                 logger.info("Saving categories to database...")
                 for i, category in enumerate(categories):
-                    logger.info(f"Processing category {i+1}/{len(categories)}: '{category.name}' (ID: '{category.id}')")
-                    logger.info(f"  - Category has {len(category.items)} items")
+                    logger.info(f"[SAVE] Processing category {i+1}/{len(categories)}: '{category.name}' (ID: '{category.id}')")
+                    logger.info(f"[SAVE]   - Category has {len(category.items)} items")
+                    logger.info(f"[SAVE]   - order_index: {category.order_index}")
+                    logger.info(f"[SAVE]   - is_active: {category.is_active}")
+                    logger.info(f"[SAVE]   - is_predefined: {category.is_predefined}")
+
                     for idx, item in enumerate(category.items):
-                        logger.info(f"    Item {idx+1}: {item.label} (ID: {item.id})")
-                    logger.debug(f"  - ID is digit: {category.id.isdigit()}")
-                    logger.debug(f"  - ID in existing_ids: {category.id in existing_ids}")
-                    logger.debug(f"  - Name in existing_names: {category.name in existing_names}")
+                        logger.info(f"[SAVE]     Item {idx+1}: {item.label} (ID: {item.id})")
+
+                    logger.debug(f"[SAVE]   - ID is digit: {category.id.isdigit()}")
+                    logger.debug(f"[SAVE]   - ID in existing_ids: {category.id in existing_ids}")
+                    logger.debug(f"[SAVE]   - Name in existing_names: {category.name in existing_names}")
 
                     # Track this category
                     current_category_names.add(category.name)
@@ -330,21 +335,27 @@ class SettingsWindow(QDialog):
 
                     # Check if category exists by ID (numeric) or by name
                     if category.id.isdigit() and category.id in existing_ids:
-                        logger.info(f"→ Updating existing category by ID: {category.id}")
+                        logger.info(f"[SAVE] → Updating existing category by ID: {category.id}")
                         result = self.config_manager.update_category(category.id, category)
-                        logger.info(f"  Update result: {result}")
+                        logger.info(f"[SAVE]   Update result: {result}")
                     elif category.name in existing_names:
                         # Category exists with this name - update it
                         existing_cat = existing_names[category.name]
-                        logger.info(f"→ Updating existing category by name: '{category.name}' (ID: {existing_cat.id})")
+                        logger.info(f"[SAVE] → Updating existing category by name: '{category.name}' (ID: {existing_cat.id})")
                         result = self.config_manager.update_category(existing_cat.id, category)
-                        logger.info(f"  Update result: {result}")
+                        logger.info(f"[SAVE]   Update result: {result}")
                         # Track the actual ID from database
                         current_category_ids.add(existing_cat.id)
                     else:
-                        logger.info(f"→ Adding NEW category: '{category.name}' (ID: '{category.id}')")
+                        logger.info(f"[SAVE] → This is a NEW CATEGORY! '{category.name}' (ID: '{category.id}')")
+                        logger.info(f"[SAVE]   Calling config_manager.add_category()...")
+                        logger.info(f"[SAVE]   Category validation: {category.validate()}")
                         result = self.config_manager.add_category(category)
-                        logger.info(f"  Add result: {result}")
+                        logger.info(f"[SAVE]   Add result: {result}")
+                        if not result:
+                            logger.error(f"[SAVE]   ❌ FAILED to add category '{category.name}'!")
+                        else:
+                            logger.info(f"[SAVE]   ✅ Category '{category.name}' added successfully")
 
                 # Delete categories that were removed from the editor
                 logger.info("Checking for deleted categories...")

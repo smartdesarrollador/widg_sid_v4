@@ -326,7 +326,7 @@ class DBManager:
         return result[0] if result else None
 
     def add_category(self, name: str, icon: str = None,
-                     is_predefined: bool = False) -> int:
+                     is_predefined: bool = False, order_index: int = None) -> int:
         """
         Add new category
 
@@ -334,22 +334,24 @@ class DBManager:
             name: Category name
             icon: Category icon (optional)
             is_predefined: Whether this is a predefined category
+            order_index: Order index (optional, will auto-calculate if None)
 
         Returns:
             int: New category ID
         """
-        # Get next order_index
-        max_order = self.execute_query(
-            "SELECT MAX(order_index) as max_order FROM categories"
-        )
-        next_order = (max_order[0]['max_order'] or 0) + 1
+        # Use provided order_index or calculate next one
+        if order_index is None:
+            max_order = self.execute_query(
+                "SELECT MAX(order_index) as max_order FROM categories"
+            )
+            order_index = (max_order[0]['max_order'] or 0) + 1
 
         query = """
             INSERT INTO categories (name, icon, order_index, is_predefined, updated_at)
             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
         """
-        category_id = self.execute_update(query, (name, icon, next_order, is_predefined))
-        logger.info(f"Category added: {name} (ID: {category_id})")
+        category_id = self.execute_update(query, (name, icon, order_index, is_predefined))
+        logger.info(f"Category added: {name} (ID: {category_id}, order_index: {order_index})")
         return category_id
 
     def update_category(self, category_id: int, name: str = None,
@@ -505,8 +507,9 @@ class DBManager:
 
     def add_item(self, category_id: int, label: str, content: str,
                  item_type: str = 'TEXT', icon: str = None,
-                 is_sensitive: bool = False, tags: List[str] = None,
-                 description: str = None, working_dir: str = None) -> int:
+                 is_sensitive: bool = False, is_favorite: bool = False,
+                 tags: List[str] = None, description: str = None,
+                 working_dir: str = None) -> int:
         """
         Add new item to category
 
@@ -517,6 +520,7 @@ class DBManager:
             item_type: Item type (TEXT, URL, CODE, PATH)
             icon: Item icon (optional)
             is_sensitive: Whether content is sensitive (will encrypt content)
+            is_favorite: Whether item is marked as favorite
             tags: List of tags (optional)
             description: Item description (optional)
             working_dir: Working directory for CODE items (optional)
@@ -534,14 +538,14 @@ class DBManager:
         tags_json = json.dumps(tags or [])
         query = """
             INSERT INTO items
-            (category_id, label, content, type, icon, is_sensitive, tags, description, working_dir, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            (category_id, label, content, type, icon, is_sensitive, is_favorite, tags, description, working_dir, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         """
         item_id = self.execute_update(
             query,
-            (category_id, label, content, item_type, icon, is_sensitive, tags_json, description, working_dir)
+            (category_id, label, content, item_type, icon, is_sensitive, is_favorite, tags_json, description, working_dir)
         )
-        logger.info(f"Item added: {label} (ID: {item_id}, Sensitive: {is_sensitive})")
+        logger.info(f"Item added: {label} (ID: {item_id}, Sensitive: {is_sensitive}, Favorite: {is_favorite})")
         return item_id
 
     def update_item(self, item_id: int, **kwargs) -> None:
@@ -550,9 +554,9 @@ class DBManager:
 
         Args:
             item_id: Item ID to update
-            **kwargs: Fields to update (label, content, type, icon, is_sensitive, tags, description, working_dir)
+            **kwargs: Fields to update (label, content, type, icon, is_sensitive, is_favorite, tags, description, working_dir)
         """
-        allowed_fields = ['label', 'content', 'type', 'icon', 'is_sensitive', 'tags', 'description', 'working_dir']
+        allowed_fields = ['label', 'content', 'type', 'icon', 'is_sensitive', 'is_favorite', 'tags', 'description', 'working_dir']
         updates = []
         params = []
 

@@ -242,6 +242,12 @@ class CategoryEditor(QWidget):
 
     def load_categories(self):
         """Load categories from controller"""
+        import traceback
+        logger.warning(f"[LOAD_CATEGORIES] ⚠️ CALLED! This will OVERWRITE self.categories")
+        logger.warning(f"[LOAD_CATEGORIES] Called from:")
+        logger.warning(f"[LOAD_CATEGORIES] {''.join(traceback.format_stack()[-3:-1])}")
+        logger.warning(f"[LOAD_CATEGORIES] Current categories in memory: {len(self.categories)}")
+
         if not self.controller:
             return
 
@@ -254,7 +260,7 @@ class CategoryEditor(QWidget):
 
             # Load ALL categories with ALL items directly from database
             self.categories = self.controller.config_manager.get_categories()
-            logger.info(f"[CategoryEditor] Loaded {len(self.categories)} categories from database")
+            logger.info(f"[LOAD_CATEGORIES] ✅ Loaded {len(self.categories)} categories from database")
             for cat in self.categories:
                 logger.debug(f"  - {cat.name}: {len(cat.items)} items")
         else:
@@ -369,21 +375,39 @@ class CategoryEditor(QWidget):
         )
 
         if not ok or not name.strip():
+            logger.info("[ADD_CATEGORY] Dialog cancelled or empty name")
             return
 
         # Create new category
         category_id = f"custom_{uuid.uuid4().hex[:8]}"
+        order_idx = len(self.categories)
+
+        logger.info(f"[ADD_CATEGORY] Creating new category:")
+        logger.info(f"  - Name: {name.strip()}")
+        logger.info(f"  - ID: {category_id}")
+        logger.info(f"  - Order index: {order_idx}")
+
         new_category = Category(
             category_id=category_id,
             name=name.strip(),
             icon="",
-            order_index=len(self.categories),
-            is_active=True
+            order_index=order_idx,
+            is_active=True,
+            is_predefined=False
         )
 
+        # Verify validation
+        is_valid = new_category.validate()
+        logger.info(f"  - Validation result: {is_valid}")
+        logger.info(f"  - ID set: {new_category.id}")
+        logger.info(f"  - Name set: {new_category.name}")
+
         self.categories.append(new_category)
+        logger.info(f"[ADD_CATEGORY] Category added to editor list. Total categories: {len(self.categories)}")
+
         self.refresh_categories_list()
         self.data_changed.emit()
+        logger.info("[ADD_CATEGORY] UI refreshed and data_changed signal emitted")
 
     def delete_category(self):
         """Delete selected category"""
@@ -506,9 +530,14 @@ class CategoryEditor(QWidget):
         Returns:
             List of categories
         """
+        import traceback
+        logger.info(f"[GET_CATEGORIES] Called from:")
+        logger.info(f"[GET_CATEGORIES] {''.join(traceback.format_stack()[-3:-1])}")
         logger.info(f"[GET_CATEGORIES] Returning {len(self.categories)} categories")
         for i, cat in enumerate(self.categories):
             logger.info(f"[GET_CATEGORIES]   {i+1}. {cat.name} (ID: {cat.id}) - {len(cat.items)} items")
-            for j, item in enumerate(cat.items):
-                logger.info(f"[GET_CATEGORIES]      Item {j+1}: {item.label}")
+            # Only log items for new categories (custom_ prefix)
+            if cat.id.startswith('custom_'):
+                for j, item in enumerate(cat.items):
+                    logger.info(f"[GET_CATEGORIES]      Item {j+1}: {item.label}")
         return self.categories

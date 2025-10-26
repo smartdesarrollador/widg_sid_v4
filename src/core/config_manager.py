@@ -166,36 +166,59 @@ class ConfigManager:
             bool: True if successful
         """
         if not category.validate():
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Category validation failed: {category.name}")
             return False
 
         try:
-            # Add category to database
+            import logging
+            logger = logging.getLogger(__name__)
+
+            # Add category to database WITH order_index
             cat_id = self.db.add_category(
                 name=category.name,
                 icon=category.icon,
-                is_predefined=False
+                is_predefined=category.is_predefined,
+                order_index=category.order_index  # FIX: Pass order_index
             )
+            logger.info(f"[ConfigManager] Category added to DB: {category.name} (ID: {cat_id}, order_index: {category.order_index})")
 
             # Add items
             for item in category.items:
-                self.db.add_item(
+                item_id = self.db.add_item(
                     category_id=cat_id,
                     label=item.label,
                     content=item.content,
                     item_type=item.type.value.upper(),
                     icon=item.icon,
                     is_sensitive=item.is_sensitive,
+                    is_favorite=getattr(item, 'is_favorite', False),  # FIX: Add is_favorite
                     tags=item.tags,
                     description=item.description,
                     working_dir=getattr(item, 'working_dir', None)
                 )
+                logger.info(f"  [ConfigManager] Item added: {item.label} (ID: {item_id})")
 
             # Clear cache
             self._categories_cache = None
             return True
 
         except Exception as e:
-            print(f"Error adding category: {e}")
+            import logging
+            import traceback
+            logger = logging.getLogger(__name__)
+            error_msg = f"ERROR ADDING CATEGORY '{category.name}': {type(e).__name__}: {str(e)}"
+            logger.critical("=" * 80)
+            logger.critical(error_msg)
+            logger.critical("Full traceback:")
+            logger.critical(traceback.format_exc())
+            logger.critical("=" * 80)
+            print("\n" + "="*80)
+            print(error_msg)
+            print("Full traceback:")
+            print(traceback.format_exc())
+            print("="*80 + "\n")
             return False
 
     def update_category(self, category_id: str, updated_category: Category) -> bool:
@@ -238,6 +261,7 @@ class ConfigManager:
                     item_type=item.type.value.upper(),
                     icon=item.icon,
                     is_sensitive=item.is_sensitive,
+                    is_favorite=getattr(item, 'is_favorite', False),  # FIX: Add is_favorite
                     tags=item.tags,
                     description=item.description,
                     working_dir=getattr(item, 'working_dir', None)
