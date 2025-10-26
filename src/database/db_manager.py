@@ -594,6 +594,56 @@ class DBManager:
         self.execute_update(query, (item_id,))
         logger.debug(f"Last used updated: ID {item_id}")
 
+    def get_all_items(self, include_inactive: bool = False) -> List[Dict]:
+        """
+        Get ALL items from ALL categories with category info
+
+        Args:
+            include_inactive: Include items from inactive categories
+
+        Returns:
+            List[Dict]: List of all items with category_name, category_icon, category_color
+        """
+        query = """
+            SELECT
+                i.*,
+                c.name as category_name,
+                c.icon as category_icon,
+                c.color as category_color,
+                c.id as category_id
+            FROM items i
+            JOIN categories c ON i.category_id = c.id
+            WHERE c.is_active = 1 OR ? = 1
+            ORDER BY i.created_at DESC
+        """
+        results = self.execute_query(query, (include_inactive,))
+
+        # Initialize encryption manager for decrypting sensitive items
+        from core.encryption_manager import EncryptionManager
+        encryption_manager = EncryptionManager()
+
+        # Parse tags and decrypt sensitive content
+        for item in results:
+            # Parse tags from JSON
+            if item['tags']:
+                try:
+                    item['tags'] = json.loads(item['tags'])
+                except json.JSONDecodeError:
+                    item['tags'] = []
+            else:
+                item['tags'] = []
+
+            # Decrypt sensitive content
+            if item.get('is_sensitive') and item.get('content'):
+                try:
+                    item['content'] = encryption_manager.decrypt(item['content'])
+                    logger.debug(f"Content decrypted for item ID: {item['id']}")
+                except Exception as e:
+                    logger.error(f"Failed to decrypt item {item['id']}: {e}")
+                    item['content'] = "[DECRYPTION ERROR]"
+
+        return results
+
     def search_items(self, search_query: str, limit: int = 50) -> List[Dict]:
         """
         Search items by label or content

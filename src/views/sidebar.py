@@ -31,6 +31,9 @@ class Sidebar(QWidget):
     # Signal emitted when category filter button is clicked
     category_filter_clicked = pyqtSignal()
 
+    # Signal emitted when global search button is clicked
+    global_search_clicked = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.category_buttons = {}
@@ -102,6 +105,43 @@ class Sidebar(QWidget):
         """)
         self.scroll_up_button.clicked.connect(self.scroll_up)
         main_layout.addWidget(self.scroll_up_button)
+
+        # Global Search button (BG - Búsqueda Global)
+        self.global_search_button = QPushButton("BG")
+        self.global_search_button.setFixedSize(70, 40)
+        self.global_search_button.setToolTip("Búsqueda Global")
+        self.global_search_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.global_search_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #f093fb,
+                    stop:1 #f5576c
+                );
+                color: white;
+                border: none;
+                border-bottom: 1px solid #3d3d3d;
+                font-size: 11pt;
+                font-weight: bold;
+                letter-spacing: 2px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #df83eb,
+                    stop:1 #e4475b
+                );
+            }
+            QPushButton:pressed {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #ce73db,
+                    stop:1 #d3374a
+                );
+            }
+        """)
+        self.global_search_button.clicked.connect(self.on_global_search_clicked)
+        main_layout.addWidget(self.global_search_button)
 
         # Category Filter button (FC)
         self.category_filter_button = QPushButton("FC")
@@ -381,3 +421,7 @@ class Sidebar(QWidget):
     def on_category_filter_clicked(self):
         """Handle category filter button click"""
         self.category_filter_clicked.emit()
+
+    def on_global_search_clicked(self):
+        """Handle global search button click"""
+        self.global_search_clicked.emit()

@@ -28,9 +28,10 @@ class ItemButton(QFrame):
     item_clicked = pyqtSignal(object)
     favorite_toggled = pyqtSignal(int, bool)  # item_id, is_favorite
 
-    def __init__(self, item: Item, parent=None):
+    def __init__(self, item: Item, show_category: bool = False, parent=None):
         super().__init__(parent)
         self.item = item
+        self.show_category = show_category  # Show category badge in global search
         self.is_copied = False
         self.is_revealed = False  # Track if sensitive content is revealed
         self.reveal_timer = None  # Timer for auto-hide
@@ -107,6 +108,21 @@ class ItemButton(QFrame):
             self.label_widget.sizePolicy().Policy.Minimum
         )
         label_row.addWidget(self.label_widget)
+
+        # Category badge (for global search)
+        if self.show_category and hasattr(self.item, 'category_name') and self.item.category_name:
+            category_badge = QLabel(f"📁 {self.item.category_name}")
+            category_badge.setStyleSheet("""
+                QLabel {
+                    background-color: #3d3d3d;
+                    color: #f093fb;
+                    border-radius: 3px;
+                    padding: 2px 8px;
+                    font-size: 8pt;
+                    font-weight: bold;
+                }
+            """)
+            label_row.addWidget(category_badge)
 
         # Badge (Popular / Nuevo)
         badge = self.get_badge()

@@ -12,6 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from views.sidebar import Sidebar
 from views.floating_panel import FloatingPanel
+from views.global_search_panel import GlobalSearchPanel
 from views.favorites_floating_panel import FavoritesFloatingPanel
 from views.stats_floating_panel import StatsFloatingPanel
 from views.settings_window import SettingsWindow
@@ -43,6 +44,7 @@ class MainWindow(QMainWindow):
         self.config_manager = controller.config_manager if controller else None
         self.sidebar = None
         self.floating_panel = None  # Ventana flotante para items
+        self.global_search_panel = None  # Ventana flotante para búsqueda global
         self.favorites_panel = None  # Ventana flotante para favoritos
         self.stats_panel = None  # Ventana flotante para estadísticas
         self.category_filter_window = None  # Ventana de filtros de categorías
@@ -155,6 +157,7 @@ class MainWindow(QMainWindow):
         # Create sidebar only (no embedded panel)
         self.sidebar = Sidebar()
         self.sidebar.category_clicked.connect(self.on_category_clicked)
+        self.sidebar.global_search_clicked.connect(self.on_global_search_clicked)
         self.sidebar.favorites_clicked.connect(self.on_favorites_clicked)
         self.sidebar.stats_clicked.connect(self.on_stats_clicked)
         self.sidebar.settings_clicked.connect(self.open_settings)
@@ -225,6 +228,50 @@ class MainWindow(QMainWindow):
         if self.floating_panel:
             self.floating_panel.deleteLater()
             self.floating_panel = None
+
+    def on_global_search_clicked(self):
+        """Handle global search button click - show global search panel"""
+        try:
+            logger.info("Global search button clicked")
+
+            if not self.controller:
+                logger.error("No controller available")
+                return
+
+            # Create global search panel if it doesn't exist
+            if not self.global_search_panel:
+                # Get db_manager from controller's config_manager
+                db_manager = self.config_manager.db if self.config_manager else None
+                self.global_search_panel = GlobalSearchPanel(
+                    db_manager=db_manager,
+                    config_manager=self.config_manager
+                )
+                self.global_search_panel.item_clicked.connect(self.on_item_clicked)
+                self.global_search_panel.window_closed.connect(self.on_global_search_panel_closed)
+                logger.debug("Global search panel created")
+
+            # Load all items
+            self.global_search_panel.load_all_items()
+
+            # Position near sidebar
+            self.global_search_panel.position_near_sidebar(self)
+
+            logger.debug("Global search panel loaded and positioned")
+
+        except Exception as e:
+            logger.error(f"Error in on_global_search_clicked: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al abrir búsqueda global:\n{str(e)}\n\nRevisa widget_sidebar_error.log"
+            )
+
+    def on_global_search_panel_closed(self):
+        """Handle global search panel closed"""
+        logger.info("Global search panel closed")
+        if self.global_search_panel:
+            self.global_search_panel.deleteLater()
+            self.global_search_panel = None
 
     def on_favorites_clicked(self):
         """Handle favorites button click - show favorites panel"""
