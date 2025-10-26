@@ -139,6 +139,25 @@ class CategoryEditor(QWidget):
         self.items_label.setStyleSheet("font-weight: bold; font-size: 11pt;")
         right_layout.addWidget(self.items_label)
 
+        # Search box for items
+        self.items_search_input = QLineEdit()
+        self.items_search_input.setPlaceholderText("🔍 Buscar item...")
+        self.items_search_input.textChanged.connect(self.filter_items)
+        self.items_search_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #2d2d2d;
+                color: #cccccc;
+                border: 1px solid #3d3d3d;
+                border-radius: 4px;
+                padding: 6px;
+                font-size: 9pt;
+            }
+            QLineEdit:focus {
+                border: 1px solid #007acc;
+            }
+        """)
+        right_layout.addWidget(self.items_search_input)
+
         # Items list
         self.items_list = QListWidget()
         self.items_list.setMinimumWidth(280)
@@ -260,6 +279,25 @@ class CategoryEditor(QWidget):
             else:
                 item.setHidden(True)
 
+    def filter_items(self, text):
+        """Filter items list based on search text"""
+        search_text = text.lower().strip()
+
+        for i in range(self.items_list.count()):
+            list_item = self.items_list.item(i)
+            item = list_item.data(Qt.ItemDataRole.UserRole)
+
+            # Search in item label and content
+            matches = (
+                search_text in item.label.lower() or
+                search_text in item.content.lower()
+            )
+
+            if matches:
+                list_item.setHidden(False)
+            else:
+                list_item.setHidden(True)
+
     def on_category_selected(self):
         """Handle category selection"""
         selected_items = self.categories_list.selectedItems()
@@ -291,12 +329,19 @@ class CategoryEditor(QWidget):
         self.items_list.clear()
 
         if not self.current_category:
+            # Clear search when no category selected
+            if hasattr(self, 'items_search_input'):
+                self.items_search_input.clear()
             return
 
         for item in self.current_category.items:
             list_item = QListWidgetItem(f"{item.label}")
             list_item.setData(Qt.ItemDataRole.UserRole, item)
             self.items_list.addItem(list_item)
+
+        # Reapply filter if search text exists
+        if hasattr(self, 'items_search_input') and self.items_search_input.text():
+            self.filter_items(self.items_search_input.text())
 
     def on_item_selected(self):
         """Handle item selection"""
