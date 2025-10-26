@@ -54,6 +54,11 @@ class MainWindow(QMainWindow):
         self.notification_manager = NotificationManager()
         self.is_visible = True
 
+        # Minimizar/Maximizar estado
+        self.is_minimized = False
+        self.normal_height = None  # Se guardará después de calcular
+        self.minimized_height = 75  # Altura cuando está minimizada (title bar 30px + WS label ~45px)
+
         self.init_ui()
         self.position_window()
         self.setup_hotkeys()
@@ -77,6 +82,9 @@ class MainWindow(QMainWindow):
             window_height = int(screen_height * 0.8)  # 80% de la altura de la pantalla
         else:
             window_height = 600  # Fallback
+
+        # Guardar altura normal para minimizar/maximizar
+        self.normal_height = window_height
 
         # Set window size (starts with sidebar only)
         self.setFixedWidth(70)  # Just sidebar initially
@@ -532,9 +540,41 @@ class MainWindow(QMainWindow):
         self.raise_()
 
     def minimize_window(self):
-        """Minimize the window"""
-        logger.info("Minimizing window")
-        self.showMinimized()
+        """Toggle minimize/maximize sidebar height"""
+        if self.is_minimized:
+            # Maximizar - restaurar altura normal
+            logger.info("Maximizing sidebar to normal height")
+            self.is_minimized = False
+
+            # Mostrar el sidebar
+            if self.sidebar:
+                self.sidebar.show()
+
+            # Cambiar altura a normal
+            self.setMinimumHeight(400)
+            self.resize(70, self.normal_height)
+
+            # Cambiar icono a minimizar (línea horizontal)
+            self.minimize_button.setText("─")
+
+            logger.info(f"Sidebar maximized to height: {self.normal_height}")
+        else:
+            # Minimizar - reducir altura para mostrar solo header "WS"
+            logger.info("Minimizing sidebar to compact height")
+            self.is_minimized = True
+
+            # Ocultar el sidebar (todo excepto el title bar)
+            if self.sidebar:
+                self.sidebar.hide()
+
+            # Cambiar altura a mínima (solo title bar)
+            self.setMinimumHeight(self.minimized_height)
+            self.resize(70, self.minimized_height)
+
+            # Cambiar icono a maximizar (cuadrado)
+            self.minimize_button.setText("□")
+
+            logger.info(f"Sidebar minimized to height: {self.minimized_height}")
 
     def close_window(self):
         """Close the application"""
