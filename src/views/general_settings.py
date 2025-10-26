@@ -11,7 +11,11 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 import json
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from views.dialogs.password_verify_dialog import PasswordVerifyDialog
 
 
 class GeneralSettings(QWidget):
@@ -227,6 +231,17 @@ class GeneralSettings(QWidget):
                 "Error",
                 "ConfigManager no disponible"
             )
+            return
+
+        # Verify password before exporting (security measure)
+        password_verified = PasswordVerifyDialog.verify(
+            title="Exportar Configuración",
+            message="Por razones de seguridad, ingresa tu contraseña para exportar la configuración:",
+            parent=self.window()
+        )
+
+        if not password_verified:
+            # User cancelled or password incorrect
             return
 
         # Open file dialog
