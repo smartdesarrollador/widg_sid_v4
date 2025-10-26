@@ -67,8 +67,8 @@ class Sidebar(QWidget):
             QLabel {
                 background-color: #1e1e1e;
                 color: #007acc;
-                padding: 15px;
-                font-size: 16pt;
+                padding: 8px;
+                font-size: 12pt;
                 font-weight: bold;
                 border-bottom: 2px solid #007acc;
             }
@@ -234,7 +234,7 @@ class Sidebar(QWidget):
 
         # Favorites button
         self.favorites_button = QPushButton("⭐")
-        self.favorites_button.setFixedSize(70, 60)
+        self.favorites_button.setFixedSize(70, 45)
         self.favorites_button.setToolTip("Favoritos")
         self.favorites_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.favorites_button.setStyleSheet("""
@@ -243,7 +243,7 @@ class Sidebar(QWidget):
                 color: #cccccc;
                 border: none;
                 border-top: 1px solid #1e1e1e;
-                font-size: 20pt;
+                font-size: 16pt;
             }
             QPushButton:hover {
                 background-color: #3d3d3d;
@@ -259,7 +259,7 @@ class Sidebar(QWidget):
 
         # Stats button
         self.stats_button = QPushButton("📊")
-        self.stats_button.setFixedSize(70, 60)
+        self.stats_button.setFixedSize(70, 45)
         self.stats_button.setToolTip("Estadísticas")
         self.stats_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.stats_button.setStyleSheet("""
@@ -268,7 +268,7 @@ class Sidebar(QWidget):
                 color: #cccccc;
                 border: none;
                 border-top: 1px solid #1e1e1e;
-                font-size: 20pt;
+                font-size: 16pt;
             }
             QPushButton:hover {
                 background-color: #3d3d3d;
@@ -284,7 +284,7 @@ class Sidebar(QWidget):
 
         # Settings button at the bottom
         self.settings_button = QPushButton("⚙")
-        self.settings_button.setFixedSize(70, 60)
+        self.settings_button.setFixedSize(70, 45)
         self.settings_button.setToolTip("Configuración")
         self.settings_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.settings_button.setStyleSheet("""
@@ -293,7 +293,7 @@ class Sidebar(QWidget):
                 color: #cccccc;
                 border: none;
                 border-top: 1px solid #1e1e1e;
-                font-size: 20pt;
+                font-size: 16pt;
             }
             QPushButton:hover {
                 background-color: #3d3d3d;
