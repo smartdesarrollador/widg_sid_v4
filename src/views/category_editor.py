@@ -245,11 +245,22 @@ class CategoryEditor(QWidget):
         if not self.controller:
             return
 
-        # Clear cache to force reload from database with all items
+        # IMPORTANT: Always load directly from config_manager to get ALL categories with ALL items
+        # Do NOT use controller.get_categories() because it might return filtered categories
+        # without items loaded (from CategoryFilterEngine)
         if hasattr(self.controller, 'config_manager'):
+            # Clear cache to force fresh reload from database
             self.controller.config_manager._categories_cache = None
 
-        self.categories = self.controller.get_categories()
+            # Load ALL categories with ALL items directly from database
+            self.categories = self.controller.config_manager.get_categories()
+            logger.info(f"[CategoryEditor] Loaded {len(self.categories)} categories from database")
+            for cat in self.categories:
+                logger.debug(f"  - {cat.name}: {len(cat.items)} items")
+        else:
+            # Fallback to controller (shouldn't happen)
+            self.categories = self.controller.get_categories()
+
         self.refresh_categories_list()
 
     def refresh_categories_list(self):

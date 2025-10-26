@@ -22,7 +22,8 @@
       "Bash(python test_favorite_fix.py:*)",
       "Bash(timeout /t 5)",
       "Bash(powershell:*)",
-      "Bash(python migrate_add_working_dir.py:*)"
+      "Bash(python migrate_add_working_dir.py:*)",
+      "Bash(dir /B:*)"
     ],
     "deny": [],
     "ask": []

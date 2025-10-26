@@ -30,7 +30,10 @@ class MainController:
         self.clipboard_controller = ClipboardController(self.clipboard_manager)
 
         # Data
-        self.categories: List[Category] = []
+        self.categories: List[Category] = []  # All categories (unfiltered, for compatibility)
+        self._all_categories: List[Category] = []  # Master list: ALL categories from DB
+        self._filtered_categories: List[Category] = []  # Filtered categories for UI
+        self._filters_active: bool = False  # Flag to track if filters are active
         self.current_category: Optional[Category] = None
         self.main_window = None  # Will be set by main.py
 
@@ -43,15 +46,31 @@ class MainController:
         self.config_manager.load_config()
 
         print("Loading categories...")
-        self.categories = self.config_manager.load_default_categories()
+        self._all_categories = self.config_manager.load_default_categories()
+        self.categories = self._all_categories  # Initially, categories = all categories
+        self._filters_active = False
 
         print(f"Loaded {len(self.categories)} categories")
         for cat in self.categories:
             print(f"  - {cat.name}: {len(cat.items)} items")
 
-    def get_categories(self) -> List[Category]:
-        """Get all categories"""
-        return self.categories
+    def get_categories(self, include_filtered: bool = True) -> List[Category]:
+        """
+        Get categories
+
+        Args:
+            include_filtered: If True and filters are active, return filtered categories.
+                             If False, always return all categories from database.
+
+        Returns:
+            List of categories
+        """
+        if include_filtered and self._filters_active:
+            # Return filtered categories if filters are active
+            return self._filtered_categories
+        else:
+            # Return all categories (unfiltered)
+            return self._all_categories
 
     def get_category(self, category_id: str) -> Optional[Category]:
         """Get a specific category by ID"""
@@ -101,7 +120,11 @@ class MainController:
 
             logger.info(f"Filter result: {len(filtered_categories)} categories")
 
-            # Update the categories list
+            # Store filtered categories separately (DO NOT replace self._all_categories)
+            self._filtered_categories = filtered_categories
+            self._filters_active = True
+
+            # For backward compatibility, also update self.categories
             self.categories = filtered_categories
 
             # Update the UI (sidebar) if main_window is available
@@ -143,8 +166,11 @@ class MainController:
             # Clear filter engine cache (database may have changed)
             self.category_filter_engine.clear_cache()
 
-            # Reload categories from database
-            self.categories = self.config_manager.load_default_categories()
+            # Reload ALL categories from database
+            self._all_categories = self.config_manager.load_default_categories()
+            self.categories = self._all_categories  # Reset to all categories
+            self._filtered_categories = []
+            self._filters_active = False
 
             logger.info(f"Loaded {len(self.categories)} categories")
 
