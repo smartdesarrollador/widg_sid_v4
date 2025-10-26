@@ -164,25 +164,25 @@ class ItemButton(QFrame):
             tags_layout.addStretch()
             left_layout.addLayout(tags_layout)
 
-        # Usage stats (use_count + last_used)
-        stats_text = self.get_usage_stats()
-        if stats_text:
-            stats_label = QLabel(stats_text)
-            stats_label.setStyleSheet("""
-                QLabel {
-                    color: #858585;
-                    font-size: 8pt;
-                    font-style: italic;
-                    background-color: transparent;
-                    border: none;
-                }
-            """)
-            stats_label.setWordWrap(True)
-            stats_label.setSizePolicy(
-                stats_label.sizePolicy().Policy.Expanding,
-                stats_label.sizePolicy().Policy.Minimum
-            )
-            left_layout.addWidget(stats_label)
+        # Usage stats (use_count + last_used) - DISABLED
+        # stats_text = self.get_usage_stats()
+        # if stats_text:
+        #     stats_label = QLabel(stats_text)
+        #     stats_label.setStyleSheet("""
+        #         QLabel {
+        #             color: #858585;
+        #             font-size: 8pt;
+        #             font-style: italic;
+        #             background-color: transparent;
+        #             border: none;
+        #         }
+        #     """)
+        #     stats_label.setWordWrap(True)
+        #     stats_label.setSizePolicy(
+        #         stats_label.sizePolicy().Policy.Expanding,
+        #         stats_label.sizePolicy().Policy.Minimum
+        #     )
+        #     left_layout.addWidget(stats_label)
 
         main_layout.addLayout(left_layout, 1)
 
