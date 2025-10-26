@@ -281,7 +281,7 @@ class CategoryEditor(QWidget):
             category_id=category_id,
             name=name.strip(),
             icon="",
-            order=len(self.categories),
+            order_index=len(self.categories),
             is_active=True
         )
 
