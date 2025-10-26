@@ -327,6 +327,7 @@ class CategoryEditor(QWidget):
                 item_type=item_data["type"],
                 tags=item_data["tags"],
                 is_sensitive=item_data.get("is_sensitive", False),
+                is_favorite=item_data.get("is_favorite", False),
                 description=item_data.get("description")
             )
 

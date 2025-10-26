@@ -277,6 +277,7 @@ class GlobalSearchPanel(QWidget):
                     item_type=item_type,
                     icon=item_dict.get('icon'),
                     is_sensitive=bool(item_dict.get('is_sensitive', False)),
+                    is_favorite=bool(item_dict.get('is_favorite', False)),
                     tags=item_dict.get('tags', []),
                     description=item_dict.get('description')
                 )

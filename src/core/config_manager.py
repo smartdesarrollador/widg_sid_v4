@@ -494,6 +494,7 @@ class ConfigManager:
             item_type=item_type,
             icon=data.get('icon'),
             is_sensitive=bool(data.get('is_sensitive', False)),
+            is_favorite=bool(data.get('is_favorite', False)),
             tags=data.get('tags', []),
             description=data.get('description')
         )

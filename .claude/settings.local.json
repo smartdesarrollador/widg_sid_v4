@@ -17,7 +17,9 @@
       "Bash(sqlite3:*)",
       "Bash(python check_tags.py:*)",
       "Bash(python test_tags_fix.py:*)",
-      "Bash(start python main.py)"
+      "Bash(start python main.py)",
+      "Bash(python debug_favorites.py:*)",
+      "Bash(python test_favorite_fix.py:*)"
     ],
     "deny": [],
     "ask": []
