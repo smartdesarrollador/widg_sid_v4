@@ -196,7 +196,8 @@ class ConfigManager:
                     is_favorite=getattr(item, 'is_favorite', False),  # FIX: Add is_favorite
                     tags=item.tags,
                     description=item.description,
-                    working_dir=getattr(item, 'working_dir', None)
+                    working_dir=getattr(item, 'working_dir', None),
+                    color=getattr(item, 'color', None)  # FIX: Add color
                 )
                 logger.info(f"  [ConfigManager] Item added: {item.label} (ID: {item_id})")
 
@@ -264,7 +265,8 @@ class ConfigManager:
                     is_favorite=getattr(item, 'is_favorite', False),  # FIX: Add is_favorite
                     tags=item.tags,
                     description=item.description,
-                    working_dir=getattr(item, 'working_dir', None)
+                    working_dir=getattr(item, 'working_dir', None),
+                    color=getattr(item, 'color', None)  # FIX: Add color
                 )
 
             # Clear cache
@@ -526,7 +528,8 @@ class ConfigManager:
             is_favorite=bool(data.get('is_favorite', False)),
             tags=data.get('tags', []),
             description=data.get('description'),
-            working_dir=data.get('working_dir')
+            working_dir=data.get('working_dir'),
+            color=data.get('color')
         )
         return item
 

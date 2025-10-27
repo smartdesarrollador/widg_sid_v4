@@ -14,7 +14,7 @@ from typing import List, Dict
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QSpinBox, QPushButton, QScrollArea,
-    QWidget, QMessageBox
+    QWidget, QMessageBox, QComboBox
 )
 from PyQt6.QtCore import Qt
 
@@ -102,6 +102,32 @@ class BulkItemDialog(QDialog):
         self.tags_input = QLineEdit()
         self.tags_input.setPlaceholderText("tag1, tag2, tag3 (separados por comas)")
         layout.addWidget(self.tags_input)
+
+        # === SELECTOR DE COLOR ===
+        color_label = QLabel("Color (opcional):")
+        color_label.setStyleSheet("font-size: 12px; margin-top: 10px;")
+        layout.addWidget(color_label)
+
+        # Definir colores disponibles (hex)
+        self.colors = {
+            "Sin color": None,
+            "🔴 Rojo": "#FF4444",
+            "🟢 Verde": "#44FF44",
+            "🔵 Azul": "#4444FF",
+            "🟡 Amarillo": "#FFDD44",
+            "🟠 Naranja": "#FF8844",
+            "🟣 Morado": "#AA44FF",
+            "🌸 Rosa": "#FF44AA",
+            "🔷 Cyan": "#44FFFF"
+        }
+
+        # Crear QComboBox para selección de color
+        self.color_combo = QComboBox()
+        self.color_combo.addItems(self.colors.keys())
+        self.color_combo.setCurrentIndex(0)  # Default: "Sin color"
+        self.color_combo.currentIndexChanged.connect(self.on_color_changed)
+
+        layout.addWidget(self.color_combo)
 
         # === INFO ===
         info_label = QLabel("9 Tipo: TEXT | label = content | Editable después individualmente")
@@ -328,6 +354,42 @@ class BulkItemDialog(QDialog):
         for line_edit in self.item_inputs:
             line_edit.setStyleSheet(input_style)
 
+        # Estilo para QComboBox de colores
+        combo_style = """
+            QComboBox {
+                background-color: #2b2b2b;
+                color: #ffffff;
+                border: 1px solid #555555;
+                border-radius: 4px;
+                padding: 8px;
+                font-size: 13px;
+                min-width: 200px;
+            }
+            QComboBox:hover {
+                border: 1px solid #0d7377;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 30px;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid #ffffff;
+                margin-right: 10px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #2b2b2b;
+                color: #ffffff;
+                selection-background-color: #0d7377;
+                selection-color: #ffffff;
+                border: 1px solid #555555;
+                outline: none;
+            }
+        """
+        self.color_combo.setStyleSheet(combo_style)
+
         # Estilo para scroll area
         scroll_style = """
             QScrollArea {
@@ -400,3 +462,24 @@ class BulkItemDialog(QDialog):
                 """)
 
         logger.debug("[BULK_DIALOG] Styles applied successfully")
+
+    def on_color_changed(self, index: int):
+        """
+        Callback cuando cambia la selección de color
+
+        Args:
+            index: Índice del item seleccionado en el QComboBox
+        """
+        selected_text = self.color_combo.currentText()
+        color_hex = self.colors.get(selected_text)
+        logger.debug(f"[BULK_DIALOG] Color changed to: {selected_text} ({color_hex})")
+
+    def get_selected_color(self) -> str:
+        """
+        Obtener el color seleccionado
+
+        Returns:
+            Código hexadecimal del color o None si no hay color
+        """
+        selected_text = self.color_combo.currentText()
+        return self.colors.get(selected_text)

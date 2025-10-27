@@ -88,6 +88,20 @@ class ItemButton(QFrame):
         main_layout.setContentsMargins(15, 8, 15, 8)
         main_layout.setSpacing(10)
 
+        # Color indicator (if item has color)
+        if hasattr(self.item, 'color') and self.item.color:
+            color_indicator = QLabel()
+            color_indicator.setFixedSize(25, 25)
+            color_indicator.setStyleSheet(f"""
+                QLabel {{
+                    background-color: {self.item.color};
+                    border-radius: 4px;
+                    border: 1px solid #555555;
+                }}
+            """)
+            color_indicator.setToolTip(f"Color: {self.item.color}")
+            main_layout.addWidget(color_indicator)
+
         # Left side: Item info (label + badges + tags + stats)
         left_layout = QVBoxLayout()
         left_layout.setSpacing(5)

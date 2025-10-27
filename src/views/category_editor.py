@@ -508,6 +508,7 @@ class CategoryEditor(QWidget):
 
         if dialog.exec() == QDialog.DialogCode.Accepted:
             items_data = dialog.get_items_data()
+            selected_color = dialog.get_selected_color()  # Obtener color seleccionado
 
             if not items_data:
                 QMessageBox.information(
@@ -530,11 +531,12 @@ class CategoryEditor(QWidget):
                     tags=item_data["tags"],
                     description="",  # Vacío por defecto
                     is_sensitive=False,  # Por defecto no es sensible
-                    icon=None
+                    icon=None,
+                    color=selected_color  # Asignar color seleccionado
                 )
                 category.items.append(item)
                 created_count += 1
-                logger.debug(f"[BULK_CREATE] Created item: '{item.label}' with ID: {item_id}")
+                logger.debug(f"[BULK_CREATE] Created item: '{item.label}' with ID: {item_id}, color: {selected_color}")
 
             # Refresh UI
             self.refresh_items_list()

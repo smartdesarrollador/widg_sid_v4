@@ -509,7 +509,7 @@ class DBManager:
                  item_type: str = 'TEXT', icon: str = None,
                  is_sensitive: bool = False, is_favorite: bool = False,
                  tags: List[str] = None, description: str = None,
-                 working_dir: str = None) -> int:
+                 working_dir: str = None, color: str = None) -> int:
         """
         Add new item to category
 
@@ -524,6 +524,7 @@ class DBManager:
             tags: List of tags (optional)
             description: Item description (optional)
             working_dir: Working directory for CODE items (optional)
+            color: Item color for visual identification (optional)
 
         Returns:
             int: New item ID
@@ -538,12 +539,12 @@ class DBManager:
         tags_json = json.dumps(tags or [])
         query = """
             INSERT INTO items
-            (category_id, label, content, type, icon, is_sensitive, is_favorite, tags, description, working_dir, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            (category_id, label, content, type, icon, is_sensitive, is_favorite, tags, description, working_dir, color, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         """
         item_id = self.execute_update(
             query,
-            (category_id, label, content, item_type, icon, is_sensitive, is_favorite, tags_json, description, working_dir)
+            (category_id, label, content, item_type, icon, is_sensitive, is_favorite, tags_json, description, working_dir, color)
         )
         logger.info(f"Item added: {label} (ID: {item_id}, Sensitive: {is_sensitive}, Favorite: {is_favorite})")
         return item_id
