@@ -23,7 +23,9 @@
       "Bash(timeout /t 5)",
       "Bash(powershell:*)",
       "Bash(python migrate_add_working_dir.py:*)",
-      "Bash(dir /B:*)"
+      "Bash(dir /B:*)",
+      "Bash(if not exist \"C:\\Users\\ASUS\\Desktop\\proyectos_python\\widget_sidebar\\src\\views\\dialogs\" mkdir \"C:\\Users\\ASUS\\Desktop\\proyectos_python\\widget_sidebar\\src\\views\\dialogs\")",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

@@ -194,6 +194,13 @@ class CategoryEditor(QWidget):
         self.add_item_button.clicked.connect(self.add_item)
         self.add_item_button.setEnabled(False)
 
+        # Botón de creación masiva
+        self.bulk_add_button = QPushButton("📝")
+        self.bulk_add_button.setFixedSize(40, 30)
+        self.bulk_add_button.setToolTip("Crear múltiples items de forma rápida")
+        self.bulk_add_button.clicked.connect(self.create_bulk_items)
+        self.bulk_add_button.setEnabled(False)
+
         self.edit_item_button = QPushButton("✎")
         self.edit_item_button.setFixedSize(40, 30)
         self.edit_item_button.setToolTip("Editar item")
@@ -207,6 +214,7 @@ class CategoryEditor(QWidget):
         self.delete_item_button.setEnabled(False)
 
         item_buttons_layout.addWidget(self.add_item_button)
+        item_buttons_layout.addWidget(self.bulk_add_button)
         item_buttons_layout.addWidget(self.edit_item_button)
         item_buttons_layout.addWidget(self.delete_item_button)
         item_buttons_layout.addStretch()
@@ -237,6 +245,7 @@ class CategoryEditor(QWidget):
         self.add_cat_button.setStyleSheet(button_style)
         self.delete_cat_button.setStyleSheet(button_style)
         self.add_item_button.setStyleSheet(button_style)
+        self.bulk_add_button.setStyleSheet(button_style)
         self.edit_item_button.setStyleSheet(button_style)
         self.delete_item_button.setStyleSheet(button_style)
 
@@ -325,6 +334,7 @@ class CategoryEditor(QWidget):
             self.items_label.setText("Items")
             self.delete_cat_button.setEnabled(False)
             self.add_item_button.setEnabled(False)
+            self.bulk_add_button.setEnabled(False)
             return
 
         # Get selected category
@@ -340,6 +350,7 @@ class CategoryEditor(QWidget):
         # Enable buttons
         self.delete_cat_button.setEnabled(True)
         self.add_item_button.setEnabled(True)
+        self.bulk_add_button.setEnabled(True)
 
     def refresh_items_list(self):
         """Refresh the items list for current category"""
@@ -472,6 +483,76 @@ class CategoryEditor(QWidget):
             self.data_changed.emit()
         else:
             logger.info("[ADD_ITEM] Dialog was cancelled")
+
+    def create_bulk_items(self):
+        """Crear múltiples items de forma masiva"""
+        if not self.current_category:
+            QMessageBox.warning(
+                self,
+                "Error",
+                "Selecciona una categoría primero"
+            )
+            logger.warning("[BULK_CREATE] No current category selected")
+            return
+
+        # Guardar referencia a la categoría antes de refrescar listas
+        # (refresh_categories_list() limpia la selección)
+        category = self.current_category
+        logger.info(f"[BULK_CREATE] Opening bulk dialog for category: {category.name}")
+
+        # Importar el diálogo
+        from views.dialogs.bulk_item_dialog import BulkItemDialog
+
+        # Abrir diálogo de creación masiva
+        dialog = BulkItemDialog(category.name, self)
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            items_data = dialog.get_items_data()
+
+            if not items_data:
+                QMessageBox.information(
+                    self,
+                    "Información",
+                    "No se ingresaron items"
+                )
+                logger.info("[BULK_CREATE] No items entered, dialog accepted but no data")
+                return
+
+            # Crear items
+            created_count = 0
+            for item_data in items_data:
+                item_id = f"item_{uuid.uuid4().hex[:8]}"
+                item = Item(
+                    item_id=item_id,
+                    label=item_data["label"],
+                    content=item_data["label"],  # Mismo valor para label y content
+                    item_type=ItemType.TEXT,  # Tipo fijo TEXT
+                    tags=item_data["tags"],
+                    description="",  # Vacío por defecto
+                    is_sensitive=False,  # Por defecto no es sensible
+                    icon=None
+                )
+                category.items.append(item)
+                created_count += 1
+                logger.debug(f"[BULK_CREATE] Created item: '{item.label}' with ID: {item_id}")
+
+            # Refresh UI
+            self.refresh_items_list()
+            self.refresh_categories_list()  # Update count
+            self.data_changed.emit()
+
+            # Notificación de éxito
+            QMessageBox.information(
+                self,
+                "Éxito",
+                f"✅ Se crearon {created_count} items exitosamente\n\n"
+                f"Puedes editarlos individualmente si necesitas cambiar el tipo, "
+                f"agregar descripción o modificar el contenido."
+            )
+
+            logger.info(f"[BULK_CREATE] Successfully created {created_count} items in category '{category.name}'")
+        else:
+            logger.info("[BULK_CREATE] Dialog cancelled by user")
 
     def edit_item(self):
         """Edit selected item"""
