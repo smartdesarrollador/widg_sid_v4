@@ -91,12 +91,11 @@ class ItemButton(QFrame):
         # Color indicator (if item has color)
         if hasattr(self.item, 'color') and self.item.color:
             color_indicator = QLabel()
-            color_indicator.setFixedSize(25, 25)
+            color_indicator.setFixedSize(6, 30)  # Barra vertical delgada
             color_indicator.setStyleSheet(f"""
                 QLabel {{
                     background-color: {self.item.color};
-                    border-radius: 4px;
-                    border: 1px solid #555555;
+                    border-radius: 2px;
                 }}
             """)
             color_indicator.setToolTip(f"Color: {self.item.color}")
