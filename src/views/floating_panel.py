@@ -674,14 +674,14 @@ class FloatingPanel(QWidget):
             minimized_width = 180
             self.resize(minimized_width, minimized_height)
 
-            # Move to bottom of screen (just above taskbar)
+            # Move to bottom of screen (al ras de la barra de tareas)
             from PyQt6.QtWidgets import QApplication
             screen = QApplication.primaryScreen()
             if screen:
                 screen_geometry = screen.availableGeometry()
-                # Position just above the taskbar (50px from bottom)
+                # Position al ras de la barra de tareas (5px margin)
                 new_x = self.x()  # Keep same X position
-                new_y = screen_geometry.bottom() - minimized_height - 50  # 50px margin from bottom (above taskbar)
+                new_y = screen_geometry.bottom() - minimized_height - 5  # 5px margin - al ras de taskbar
                 self.move(new_x, new_y)
                 logger.info(f"Moved minimized panel to bottom: ({new_x}, {new_y})")
 

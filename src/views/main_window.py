@@ -285,22 +285,10 @@ class MainWindow(QMainWindow):
                 logger.info(f"Panel unpinned and became active panel. Remaining pinned: {len(self.pinned_panels)}")
 
     def position_new_panel(self, panel):
-        """Position a new panel with cascade effect if there are multiple panels"""
-        # Calculate base position (next to sidebar)
+        """Position a new panel always at the same initial position (next to sidebar)"""
+        # Calculate base position (next to sidebar) - always the same position
         panel.position_near_sidebar(self)
-
-        # If there are pinned panels, add cascade offset
-        total_panels = len(self.pinned_panels)
-        if total_panels > 0:
-            # Cascade effect: offset by 30px horizontally and 30px vertically for each pinned panel
-            offset_x = 30 * total_panels
-            offset_y = 30 * total_panels
-
-            current_x = panel.x()
-            current_y = panel.y()
-
-            panel.move(current_x + offset_x, current_y + offset_y)
-            logger.info(f"Panel positioned with cascade offset: x+{offset_x}, y+{offset_y}")
+        logger.info(f"Panel positioned at initial position next to sidebar")
 
     def on_global_search_clicked(self):
         """Handle global search button click - show global search panel"""
