@@ -509,7 +509,8 @@ class DBManager:
                  item_type: str = 'TEXT', icon: str = None,
                  is_sensitive: bool = False, is_favorite: bool = False,
                  tags: List[str] = None, description: str = None,
-                 working_dir: str = None, color: str = None) -> int:
+                 working_dir: str = None, color: str = None,
+                 is_active: bool = True, is_archived: bool = False) -> int:
         """
         Add new item to category
 
@@ -525,6 +526,8 @@ class DBManager:
             description: Item description (optional)
             working_dir: Working directory for CODE items (optional)
             color: Item color for visual identification (optional)
+            is_active: Whether item is active (default True)
+            is_archived: Whether item is archived (default False)
 
         Returns:
             int: New item ID
@@ -539,14 +542,14 @@ class DBManager:
         tags_json = json.dumps(tags or [])
         query = """
             INSERT INTO items
-            (category_id, label, content, type, icon, is_sensitive, is_favorite, tags, description, working_dir, color, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            (category_id, label, content, type, icon, is_sensitive, is_favorite, tags, description, working_dir, color, is_active, is_archived, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         """
         item_id = self.execute_update(
             query,
-            (category_id, label, content, item_type, icon, is_sensitive, is_favorite, tags_json, description, working_dir, color)
+            (category_id, label, content, item_type, icon, is_sensitive, is_favorite, tags_json, description, working_dir, color, is_active, is_archived)
         )
-        logger.info(f"Item added: {label} (ID: {item_id}, Sensitive: {is_sensitive}, Favorite: {is_favorite})")
+        logger.info(f"Item added: {label} (ID: {item_id}, Sensitive: {is_sensitive}, Favorite: {is_favorite}, Active: {is_active}, Archived: {is_archived})")
         return item_id
 
     def update_item(self, item_id: int, **kwargs) -> None:
@@ -555,9 +558,9 @@ class DBManager:
 
         Args:
             item_id: Item ID to update
-            **kwargs: Fields to update (label, content, type, icon, is_sensitive, is_favorite, tags, description, working_dir)
+            **kwargs: Fields to update (label, content, type, icon, is_sensitive, is_favorite, tags, description, working_dir, is_active, is_archived)
         """
-        allowed_fields = ['label', 'content', 'type', 'icon', 'is_sensitive', 'is_favorite', 'tags', 'description', 'working_dir']
+        allowed_fields = ['label', 'content', 'type', 'icon', 'is_sensitive', 'is_favorite', 'tags', 'description', 'working_dir', 'color', 'is_active', 'is_archived']
         updates = []
         params = []
 

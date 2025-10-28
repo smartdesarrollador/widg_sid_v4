@@ -197,7 +197,9 @@ class ConfigManager:
                     tags=item.tags,
                     description=item.description,
                     working_dir=getattr(item, 'working_dir', None),
-                    color=getattr(item, 'color', None)  # FIX: Add color
+                    color=getattr(item, 'color', None),  # FIX: Add color
+                    is_active=getattr(item, 'is_active', True),  # Add is_active (default True)
+                    is_archived=getattr(item, 'is_archived', False)  # Add is_archived (default False)
                 )
                 logger.info(f"  [ConfigManager] Item added: {item.label} (ID: {item_id})")
 
@@ -266,7 +268,9 @@ class ConfigManager:
                     tags=item.tags,
                     description=item.description,
                     working_dir=getattr(item, 'working_dir', None),
-                    color=getattr(item, 'color', None)  # FIX: Add color
+                    color=getattr(item, 'color', None),  # FIX: Add color
+                    is_active=getattr(item, 'is_active', True),  # Add is_active (default True)
+                    is_archived=getattr(item, 'is_archived', False)  # Add is_archived (default False)
                 )
 
             # Clear cache
@@ -529,7 +533,9 @@ class ConfigManager:
             tags=data.get('tags', []),
             description=data.get('description'),
             working_dir=data.get('working_dir'),
-            color=data.get('color')
+            color=data.get('color'),
+            is_active=bool(data.get('is_active', True)),  # Add is_active (default True)
+            is_archived=bool(data.get('is_archived', False))  # Add is_archived (default False)
         )
         return item
 

@@ -1,7 +1,7 @@
 """
 Floating Panel Window - Independent window for displaying category items
 """
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QPushButton
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QPushButton, QComboBox
 from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QEvent
 from PyQt6.QtGui import QFont, QCursor
 import sys
@@ -38,6 +38,7 @@ class FloatingPanel(QWidget):
         self.filter_engine = AdvancedFilterEngine()  # Motor de filtrado avanzado
         self.all_items = []  # Store all items before filtering
         self.current_filters = {}  # Filtros activos actuales
+        self.current_state_filter = "normal"  # Filtro de estado actual: normal, archived, inactive, all
 
         # Get panel width from config
         if config_manager:
@@ -187,6 +188,62 @@ class FloatingPanel(QWidget):
         self.open_filters_button.clicked.connect(self.toggle_filters_window)
         filters_button_layout.addWidget(self.open_filters_button)
 
+        # Agregar espaciador
+        filters_button_layout.addSpacing(10)
+
+        # Label para el filtro de estado
+        state_label = QLabel("Estado:")
+        state_label.setStyleSheet("""
+            QLabel {
+                color: #cccccc;
+                font-size: 10pt;
+                background: transparent;
+            }
+        """)
+        filters_button_layout.addWidget(state_label)
+
+        # ComboBox para filtrar por estado
+        self.state_filter_combo = QComboBox()
+        self.state_filter_combo.addItem("📄 Normal", "normal")
+        self.state_filter_combo.addItem("📦 Archivados", "archived")
+        self.state_filter_combo.addItem("⏸️ Inactivos", "inactive")
+        self.state_filter_combo.addItem("📋 Todos", "all")
+        self.state_filter_combo.setCurrentIndex(0)  # Default: Normal
+        self.state_filter_combo.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.state_filter_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #2d2d2d;
+                color: #cccccc;
+                border: 1px solid #3d3d3d;
+                border-radius: 4px;
+                padding: 5px 10px;
+                font-size: 10pt;
+                min-width: 140px;
+            }
+            QComboBox:hover {
+                border: 1px solid #007acc;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 5px solid #cccccc;
+                margin-right: 5px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #2d2d2d;
+                color: #cccccc;
+                selection-background-color: #007acc;
+                selection-color: #ffffff;
+                border: 1px solid #3d3d3d;
+            }
+        """)
+        self.state_filter_combo.currentIndexChanged.connect(self.on_state_filter_changed)
+        filters_button_layout.addWidget(self.state_filter_combo)
+
         main_layout.addWidget(filters_button_widget)
 
         # Crear ventana flotante de filtros (oculta inicialmente)
@@ -302,6 +359,9 @@ class FloatingPanel(QWidget):
         # Aplicar filtros avanzados primero
         filtered_items = self.filter_engine.apply_filters(self.all_items, self.current_filters)
 
+        # Aplicar filtro de estado (is_active, is_archived)
+        filtered_items = self.filter_items_by_state(filtered_items)
+
         # Luego aplicar búsqueda si hay query
         if query and query.strip():
             # Crear categoría temporal con items filtrados para búsqueda
@@ -334,6 +394,40 @@ class FloatingPanel(QWidget):
         # Re-aplicar búsqueda sin filtros
         current_query = self.search_bar.search_input.text()
         self.on_search_changed(current_query)
+
+    def on_state_filter_changed(self, index):
+        """Handle cuando cambia el filtro de estado"""
+        state_filter = self.state_filter_combo.itemData(index)
+        self.current_state_filter = state_filter
+        logger.info(f"State filter changed to: {state_filter}")
+
+        # Re-aplicar búsqueda con nuevo filtro de estado
+        current_query = self.search_bar.search_input.text()
+        self.on_search_changed(current_query)
+
+    def filter_items_by_state(self, items):
+        """Filtrar items por estado (activo/archivado)
+
+        Args:
+            items: Lista de items a filtrar
+
+        Returns:
+            Lista de items filtrados según el estado actual
+        """
+        if self.current_state_filter == "all":
+            # Mostrar todos los items
+            return items
+        elif self.current_state_filter == "normal":
+            # Mostrar solo items activos y NO archivados
+            return [item for item in items if getattr(item, 'is_active', True) and not getattr(item, 'is_archived', False)]
+        elif self.current_state_filter == "archived":
+            # Mostrar solo items archivados (independiente de si están activos)
+            return [item for item in items if getattr(item, 'is_archived', False)]
+        elif self.current_state_filter == "inactive":
+            # Mostrar solo items inactivos
+            return [item for item in items if not getattr(item, 'is_active', True)]
+        else:
+            return items
 
     def position_near_sidebar(self, sidebar_window):
         """Position the floating panel near the sidebar window"""

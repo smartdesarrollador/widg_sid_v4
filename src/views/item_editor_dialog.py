@@ -43,7 +43,7 @@ class ItemEditorDialog(QDialog):
         # Window properties
         title = "Editar Item" if self.is_edit_mode else "Nuevo Item"
         self.setWindowTitle(title)
-        self.setFixedSize(450, 500)  # Increased height for description field
+        self.setFixedSize(450, 570)  # Increased height for state checkboxes
         self.setModal(True)
 
         # Apply dark theme
@@ -176,6 +176,76 @@ class ItemEditorDialog(QDialog):
         )
         form_layout.addRow("", self.sensitive_checkbox)
 
+        # Active checkbox
+        self.active_checkbox = QCheckBox("Item activo (puede ser usado)")
+        self.active_checkbox.setChecked(True)  # Default: active
+        self.active_checkbox.setStyleSheet("""
+            QCheckBox {
+                color: #cccccc;
+                font-size: 10pt;
+                spacing: 8px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border: 2px solid #3d3d3d;
+                border-radius: 3px;
+                background-color: #2d2d2d;
+            }
+            QCheckBox::indicator:hover {
+                border: 2px solid #007acc;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #00cc00;
+                border: 2px solid #00cc00;
+                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iMTIiIHZpZXdCb3g9IjAgMCAxMiAxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTAuNSAzTDQuNSA5IDEuNSA2IiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==);
+            }
+            QCheckBox::indicator:checked:hover {
+                background-color: #009e00;
+                border: 2px solid #009e00;
+            }
+        """)
+        self.active_checkbox.setToolTip(
+            "Items activos pueden ser usados normalmente.\n"
+            "Items inactivos no pueden ser copiados al portapapeles."
+        )
+        form_layout.addRow("", self.active_checkbox)
+
+        # Archived checkbox
+        self.archived_checkbox = QCheckBox("Item archivado (ocultar de vista)")
+        self.archived_checkbox.setChecked(False)  # Default: not archived
+        self.archived_checkbox.setStyleSheet("""
+            QCheckBox {
+                color: #cccccc;
+                font-size: 10pt;
+                spacing: 8px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border: 2px solid #3d3d3d;
+                border-radius: 3px;
+                background-color: #2d2d2d;
+            }
+            QCheckBox::indicator:hover {
+                border: 2px solid #007acc;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #cc8800;
+                border: 2px solid #cc8800;
+                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iMTIiIHZpZXdCb3g9IjAgMCAxMiAxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTAuNSAzTDQuNSA5IDEuNSA2IiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==);
+            }
+            QCheckBox::indicator:checked:hover {
+                background-color: #9e6600;
+                border: 2px solid #9e6600;
+            }
+        """)
+        self.archived_checkbox.setToolTip(
+            "Items archivados no se muestran en la vista normal.\n"
+            "Pueden ser accedidos desde la vista de archivados."
+        )
+        form_layout.addRow("", self.archived_checkbox)
+
         main_layout.addLayout(form_layout)
 
         # Required fields note
@@ -243,6 +313,14 @@ class ItemEditorDialog(QDialog):
         # Load sensitive state
         if hasattr(self.item, 'is_sensitive'):
             self.sensitive_checkbox.setChecked(self.item.is_sensitive)
+
+        # Load active state
+        if hasattr(self.item, 'is_active'):
+            self.active_checkbox.setChecked(self.item.is_active)
+
+        # Load archived state
+        if hasattr(self.item, 'is_archived'):
+            self.archived_checkbox.setChecked(self.item.is_archived)
 
         # Update visibility of working dir field
         self.on_type_changed()
@@ -368,7 +446,9 @@ class ItemEditorDialog(QDialog):
             "tags": tags,
             "description": description,
             "is_sensitive": self.sensitive_checkbox.isChecked(),
-            "working_dir": working_dir
+            "working_dir": working_dir,
+            "is_active": self.active_checkbox.isChecked(),
+            "is_archived": self.archived_checkbox.isChecked()
         }
 
     def on_save(self):

@@ -464,7 +464,9 @@ class CategoryEditor(QWidget):
                 is_sensitive=item_data.get("is_sensitive", False),
                 is_favorite=item_data.get("is_favorite", False),
                 description=item_data.get("description"),
-                working_dir=item_data.get("working_dir")
+                working_dir=item_data.get("working_dir"),
+                is_active=item_data.get("is_active", True),
+                is_archived=item_data.get("is_archived", False)
             )
 
             logger.info(f"[ADD_ITEM] Created new item: {new_item.label} (ID: {new_item.id})")
@@ -532,7 +534,9 @@ class CategoryEditor(QWidget):
                     description="",  # Vacío por defecto
                     is_sensitive=False,  # Por defecto no es sensible
                     icon=None,
-                    color=selected_color  # Asignar color seleccionado
+                    color=selected_color,  # Asignar color seleccionado
+                    is_active=True,  # Por defecto activo
+                    is_archived=False  # Por defecto no archivado
                 )
                 category.items.append(item)
                 created_count += 1
@@ -578,6 +582,8 @@ class CategoryEditor(QWidget):
             item.is_sensitive = item_data.get("is_sensitive", False)
             item.description = item_data.get("description")
             item.working_dir = item_data.get("working_dir")
+            item.is_active = item_data.get("is_active", True)
+            item.is_archived = item_data.get("is_archived", False)
 
             self.refresh_items_list()
             self.data_changed.emit()

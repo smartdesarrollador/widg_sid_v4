@@ -29,7 +29,9 @@ class Item:
         tags: Optional[list] = None,
         description: Optional[str] = None,
         working_dir: Optional[str] = None,
-        color: Optional[str] = None
+        color: Optional[str] = None,
+        is_active: bool = True,
+        is_archived: bool = False
     ):
         self.id = item_id
         self.label = label
@@ -42,6 +44,8 @@ class Item:
         self.description = description
         self.working_dir = working_dir  # Directorio de trabajo para ejecutar comandos CODE
         self.color = color  # Color para identificación visual
+        self.is_active = is_active  # Si el item está activo (puede usarse)
+        self.is_archived = is_archived  # Si el item está archivado (oculto por defecto)
         self.created_at = datetime.now()
         self.last_used = datetime.now()
 
@@ -72,7 +76,9 @@ class Item:
             "tags": self.tags,
             "description": self.description,
             "working_dir": self.working_dir,
-            "color": self.color
+            "color": self.color,
+            "is_active": self.is_active,
+            "is_archived": self.is_archived
         }
 
     @classmethod
@@ -95,8 +101,35 @@ class Item:
             tags=data.get("tags", []),
             description=data.get("description"),
             working_dir=data.get("working_dir"),
-            color=data.get("color")
+            color=data.get("color"),
+            is_active=data.get("is_active", True),
+            is_archived=data.get("is_archived", False)
         )
+
+    # Estado y visibilidad
+    def is_visible(self) -> bool:
+        """Retorna True si el item está activo y NO archivado (visible por defecto)"""
+        return self.is_active and not self.is_archived
+
+    def can_use(self) -> bool:
+        """Retorna True si el item puede ser usado (activo, independiente de si está archivado)"""
+        return self.is_active
+
+    def archive(self) -> None:
+        """Archivar el item (ocultar de vista por defecto)"""
+        self.is_archived = True
+
+    def unarchive(self) -> None:
+        """Desarchivar el item (volver a vista por defecto)"""
+        self.is_archived = False
+
+    def activate(self) -> None:
+        """Activar el item (puede ser usado)"""
+        self.is_active = True
+
+    def deactivate(self) -> None:
+        """Desactivar el item (no puede ser usado)"""
+        self.is_active = False
 
     def __repr__(self) -> str:
         return f"Item(id={self.id}, label={self.label}, type={self.type.value})"
