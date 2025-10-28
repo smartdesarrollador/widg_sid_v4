@@ -43,7 +43,8 @@ class MainWindow(QMainWindow):
         self.controller = controller
         self.config_manager = controller.config_manager if controller else None
         self.sidebar = None
-        self.floating_panel = None  # Ventana flotante para items
+        self.floating_panel = None  # Panel flotante activo (no anclado) - compatibility
+        self.pinned_panels = []  # Lista de paneles anclados
         self.global_search_panel = None  # Ventana flotante para búsqueda global
         self.favorites_panel = None  # Ventana flotante para favoritos
         self.stats_panel = None  # Ventana flotante para estadísticas
@@ -182,8 +183,11 @@ class MainWindow(QMainWindow):
         try:
             logger.info(f"Category clicked: {category_id}")
 
-            # Toggle: Si se hace clic en la misma categoría, ocultar el panel
-            if self.current_category_id == category_id and self.floating_panel and self.floating_panel.isVisible():
+            # Toggle: Si se hace clic en la misma categoría Y el panel NO está anclado, ocultarlo
+            if (self.current_category_id == category_id and
+                self.floating_panel and
+                self.floating_panel.isVisible() and
+                not self.floating_panel.is_pinned):
                 logger.info(f"Toggling off - hiding floating panel for category: {category_id}")
                 self.floating_panel.hide()
                 self.current_category_id = None
@@ -197,18 +201,26 @@ class MainWindow(QMainWindow):
                 if category:
                     logger.info(f"Category found: {category.name} with {len(category.items)} items")
 
-                    # Create floating panel if it doesn't exist
+                    # Si el panel actual está anclado, agregarlo a la lista de pinned
+                    if self.floating_panel and self.floating_panel.is_pinned:
+                        logger.info(f"Current panel is pinned, adding to pinned_panels list")
+                        if self.floating_panel not in self.pinned_panels:
+                            self.pinned_panels.append(self.floating_panel)
+                        self.floating_panel = None  # Clear current panel
+
+                    # Create floating panel if it doesn't exist or current one is pinned
                     if not self.floating_panel:
                         self.floating_panel = FloatingPanel(config_manager=self.config_manager)
                         self.floating_panel.item_clicked.connect(self.on_item_clicked)
                         self.floating_panel.window_closed.connect(self.on_floating_panel_closed)
-                        logger.debug("Floating panel created")
+                        self.floating_panel.pin_state_changed.connect(self.on_panel_pin_changed)
+                        logger.debug("New floating panel created")
 
                     # Load category into floating panel
                     self.floating_panel.load_category(category)
 
-                    # Position near sidebar
-                    self.floating_panel.position_near_sidebar(self)
+                    # Position near sidebar (con offset si hay paneles anclados)
+                    self.position_new_panel(self.floating_panel)
 
                     # Update current category
                     self.current_category_id = category_id
@@ -232,10 +244,63 @@ class MainWindow(QMainWindow):
     def on_floating_panel_closed(self):
         """Handle floating panel closed"""
         logger.info("Floating panel closed")
-        self.current_category_id = None  # Reset para el toggle
-        if self.floating_panel:
-            self.floating_panel.deleteLater()
-            self.floating_panel = None
+
+        # Determinar qué panel se cerró
+        sender_panel = self.sender()
+
+        # Si es el panel actual (no anclado)
+        if sender_panel == self.floating_panel:
+            logger.info("Closing active (non-pinned) panel")
+            self.current_category_id = None  # Reset para el toggle
+            if self.floating_panel:
+                self.floating_panel.deleteLater()
+                self.floating_panel = None
+        else:
+            # Es un panel anclado
+            logger.info("Closing pinned panel")
+            if sender_panel in self.pinned_panels:
+                self.pinned_panels.remove(sender_panel)
+                sender_panel.deleteLater()
+                logger.info(f"Pinned panel removed. Remaining pinned panels: {len(self.pinned_panels)}")
+
+    def on_panel_pin_changed(self, is_pinned):
+        """Handle when a panel's pin state changes"""
+        sender_panel = self.sender()
+        logger.info(f"Panel pin state changed: is_pinned={is_pinned}")
+
+        if is_pinned:
+            # Panel was just pinned
+            if sender_panel == self.floating_panel:
+                logger.info("Active panel was pinned - will create new panel on next category click")
+        else:
+            # Panel was unpinned
+            if sender_panel in self.pinned_panels:
+                # Remove from pinned list and make it the active panel
+                self.pinned_panels.remove(sender_panel)
+                if self.floating_panel:
+                    # Current active panel becomes pinned
+                    if self.floating_panel.is_pinned:
+                        self.pinned_panels.append(self.floating_panel)
+                self.floating_panel = sender_panel
+                logger.info(f"Panel unpinned and became active panel. Remaining pinned: {len(self.pinned_panels)}")
+
+    def position_new_panel(self, panel):
+        """Position a new panel with cascade effect if there are multiple panels"""
+        # Calculate base position (next to sidebar)
+        panel.position_near_sidebar(self)
+
+        # If there are pinned panels, add cascade offset
+        total_panels = len(self.pinned_panels)
+        if total_panels > 0:
+            # Cascade effect: offset by 30px horizontally and 30px vertically for each pinned panel
+            offset_x = 30 * total_panels
+            offset_y = 30 * total_panels
+
+            current_x = panel.x()
+            current_y = panel.y()
+
+            panel.move(current_x + offset_x, current_y + offset_y)
+            logger.info(f"Panel positioned with cascade offset: x+{offset_x}, y+{offset_y}")
 
     def on_global_search_clicked(self):
         """Handle global search button click - show global search panel"""

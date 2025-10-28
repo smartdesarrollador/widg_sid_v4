@@ -30,6 +30,9 @@ class FloatingPanel(QWidget):
     # Signal emitted when window is closed
     window_closed = pyqtSignal()
 
+    # Signal emitted when pin state changes
+    pin_state_changed = pyqtSignal(bool)  # True = pinned, False = unpinned
+
     def __init__(self, config_manager=None, parent=None):
         super().__init__(parent)
         self.current_category = None
@@ -39,6 +42,7 @@ class FloatingPanel(QWidget):
         self.all_items = []  # Store all items before filtering
         self.current_filters = {}  # Filtros activos actuales
         self.current_state_filter = "normal"  # Filtro de estado actual: normal, archived, inactive, all
+        self.is_pinned = False  # Estado de anclaje del panel
 
         # Get panel width from config
         if config_manager:
@@ -125,6 +129,31 @@ class FloatingPanel(QWidget):
         """)
         self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(self.header_label)
+
+        # Pin button
+        self.pin_button = QPushButton("📌")
+        self.pin_button.setFixedSize(24, 24)
+        self.pin_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.pin_button.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.1);
+                color: #ffffff;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 12px;
+                font-size: 10pt;
+                padding: 0px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.4);
+            }
+            QPushButton:pressed {
+                background-color: rgba(255, 255, 255, 0.3);
+            }
+        """)
+        self.pin_button.setToolTip("Anclar panel (permite abrir múltiples paneles)")
+        self.pin_button.clicked.connect(self.toggle_pin)
+        header_layout.addWidget(self.pin_button)
 
         # Close button
         close_button = QPushButton("✕")
@@ -518,6 +547,57 @@ class FloatingPanel(QWidget):
             self.filters_window.show()
             self.filters_window.raise_()
             self.filters_window.activateWindow()
+
+    def toggle_pin(self):
+        """Toggle panel pin state"""
+        self.is_pinned = not self.is_pinned
+
+        # Update pin button appearance
+        if self.is_pinned:
+            self.pin_button.setText("📍")  # Pinned icon
+            self.pin_button.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(0, 200, 0, 0.3);
+                    color: #ffffff;
+                    border: 1px solid rgba(0, 200, 0, 0.6);
+                    border-radius: 12px;
+                    font-size: 10pt;
+                    padding: 0px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(0, 200, 0, 0.4);
+                    border: 1px solid rgba(0, 200, 0, 0.8);
+                }
+                QPushButton:pressed {
+                    background-color: rgba(0, 200, 0, 0.5);
+                }
+            """)
+            self.pin_button.setToolTip("Desanclar panel")
+            logger.info(f"Panel '{self.header_label.text()}' ANCLADO - puede abrir otros paneles")
+        else:
+            self.pin_button.setText("📌")  # Unpinned icon
+            self.pin_button.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(255, 255, 255, 0.1);
+                    color: #ffffff;
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    border-radius: 12px;
+                    font-size: 10pt;
+                    padding: 0px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(255, 255, 255, 0.2);
+                    border: 1px solid rgba(255, 255, 255, 0.4);
+                }
+                QPushButton:pressed {
+                    background-color: rgba(255, 255, 255, 0.3);
+                }
+            """)
+            self.pin_button.setToolTip("Anclar panel (permite abrir múltiples paneles)")
+            logger.info(f"Panel '{self.header_label.text()}' DESANCLADO")
+
+        # Emit signal
+        self.pin_state_changed.emit(self.is_pinned)
 
     def closeEvent(self, event):
         """Handle window close event"""
