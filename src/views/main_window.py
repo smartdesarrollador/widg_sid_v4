@@ -3,7 +3,7 @@ Main Window View
 """
 from PyQt6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QMessageBox
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal
-from PyQt6.QtGui import QScreen
+from PyQt6.QtGui import QScreen, QShortcut, QKeySequence
 import sys
 import logging
 import traceback
@@ -57,6 +57,10 @@ class MainWindow(QMainWindow):
         self.tray_manager = None
         self.notification_manager = NotificationManager()
         self.is_visible = True
+
+        # Panel shortcuts management
+        self.panel_shortcuts = {}  # Dict[panel_id, QShortcut] - Track keyboard shortcuts for panels
+        self.panel_by_shortcut = {}  # Dict[shortcut_str, panel] - Quick lookup panel by shortcut
 
         # Minimizar/Maximizar estado
         self.is_minimized = False
@@ -295,6 +299,23 @@ class MainWindow(QMainWindow):
 
                     # Store panel_id in the FloatingPanel instance
                     sender_panel.panel_id = panel_id
+                    logger.info(f"[SHORTCUT DEBUG] Panel anchored with panel_id: {panel_id}")
+
+                    # Register keyboard shortcut if one was assigned
+                    logger.info(f"[SHORTCUT DEBUG] Retrieving panel data to check for keyboard shortcut")
+                    panel_data = self.controller.pinned_panels_manager.get_panel_by_id(panel_id)
+                    logger.info(f"[SHORTCUT DEBUG] Panel data retrieved: {panel_data}")
+
+                    if panel_data:
+                        shortcut = panel_data.get('keyboard_shortcut')
+                        logger.info(f"[SHORTCUT DEBUG] Keyboard shortcut from database: '{shortcut}'")
+                        if shortcut:
+                            logger.info(f"[SHORTCUT DEBUG] Registering shortcut '{shortcut}' for newly pinned panel {panel_id}")
+                            self.register_panel_shortcut(sender_panel, shortcut)
+                        else:
+                            logger.info(f"[SHORTCUT DEBUG] No keyboard shortcut assigned to panel {panel_id}")
+                    else:
+                        logger.warning(f"[SHORTCUT DEBUG] Could not retrieve panel data for panel_id {panel_id}")
 
                     logger.info(f"Panel auto-saved to database with ID: {panel_id} (Category: {sender_panel.current_category.name})")
 
@@ -315,6 +336,9 @@ class MainWindow(QMainWindow):
             # Delete panel from database if it was saved
             if sender_panel.panel_id and self.controller:
                 try:
+                    # Unregister keyboard shortcut before deleting
+                    self.unregister_panel_shortcut(sender_panel)
+
                     self.controller.pinned_panels_manager.delete_panel(sender_panel.panel_id)
                     logger.info(f"Panel {sender_panel.panel_id} deleted from database on unpin")
                     # Clear panel_id so it won't try to update anymore
@@ -901,35 +925,166 @@ class MainWindow(QMainWindow):
         current_color = sender_panel.custom_color or "#007acc"
         category_name = sender_panel.current_category.name if sender_panel.current_category else ""
 
+        # Get current keyboard shortcut from database if panel is saved
+        current_shortcut = ""
+        if sender_panel.panel_id and self.controller:
+            panel_data = self.controller.pinned_panels_manager.get_panel_by_id(sender_panel.panel_id)
+            if panel_data:
+                current_shortcut = panel_data.get('keyboard_shortcut', '')
+
         # Open config dialog
         dialog = PanelConfigDialog(
             current_name=current_name,
             current_color=current_color,
+            current_shortcut=current_shortcut,
             category_name=category_name,
             parent=self
         )
 
         # Connect save signal
-        dialog.config_saved.connect(lambda name, color: self.on_panel_customized(sender_panel, name, color))
+        dialog.config_saved.connect(lambda name, color, shortcut: self.on_panel_customized(sender_panel, name, color, shortcut))
 
         # Show dialog
         dialog.exec()
 
-    def on_panel_customized(self, panel, custom_name: str, custom_color: str):
+    def on_panel_customized(self, panel, custom_name: str, custom_color: str, keyboard_shortcut: str):
         """Handle panel customization save"""
-        logger.info(f"Applying customization - Name: '{custom_name}', Color: {custom_color}")
+        logger.info(f"[SHORTCUT DEBUG] on_panel_customized called with shortcut: '{keyboard_shortcut}'")
+        logger.info(f"Applying customization - Name: '{custom_name}', Color: {custom_color}, Shortcut: '{keyboard_shortcut}'")
+        logger.info(f"[SHORTCUT DEBUG] Panel has panel_id: {panel.panel_id}")
 
         # Update panel appearance
         panel.update_customization(custom_name=custom_name, custom_color=custom_color)
 
         # If panel has panel_id (saved in database), update there too
         if panel.panel_id and self.controller:
+            logger.info(f"[SHORTCUT DEBUG] Updating panel {panel.panel_id} in database with shortcut: '{keyboard_shortcut}'")
             self.controller.pinned_panels_manager.update_panel_customization(
                 panel_id=panel.panel_id,
                 custom_name=custom_name if custom_name else None,
-                custom_color=custom_color
+                custom_color=custom_color,
+                keyboard_shortcut=keyboard_shortcut if keyboard_shortcut else None
             )
             logger.info(f"Updated panel {panel.panel_id} in database")
+
+            # Update keyboard shortcut registration
+            logger.info(f"[SHORTCUT DEBUG] About to unregister old shortcut for panel {panel.panel_id}")
+            self.unregister_panel_shortcut(panel)  # Remove old shortcut if exists
+            if keyboard_shortcut:  # Register new shortcut if provided
+                logger.info(f"[SHORTCUT DEBUG] About to register new shortcut '{keyboard_shortcut}' for panel {panel.panel_id}")
+                self.register_panel_shortcut(panel, keyboard_shortcut)
+            else:
+                logger.info(f"[SHORTCUT DEBUG] No shortcut to register (empty string)")
+
+    def register_panel_shortcut(self, panel, shortcut_str: str):
+        """
+        Register a keyboard shortcut for a panel to toggle minimize/maximize
+
+        Args:
+            panel: FloatingPanel instance
+            shortcut_str: Keyboard shortcut string (e.g., 'Ctrl+Shift+1')
+        """
+        logger.info(f"[SHORTCUT DEBUG] register_panel_shortcut called with: '{shortcut_str}', panel_id: {panel.panel_id}")
+
+        if not shortcut_str:
+            logger.warning(f"[SHORTCUT DEBUG] Empty shortcut_str, not registering")
+            return
+
+        if not panel.panel_id:
+            logger.warning(f"[SHORTCUT DEBUG] Panel has no panel_id, not registering")
+            return
+
+        try:
+            # Remove old shortcut if panel already has one
+            logger.info(f"[SHORTCUT DEBUG] Removing old shortcut if exists")
+            self.unregister_panel_shortcut(panel)
+
+            # Create QShortcut
+            logger.info(f"[SHORTCUT DEBUG] Creating QShortcut for '{shortcut_str}'")
+            key_sequence = QKeySequence(shortcut_str)
+            logger.info(f"[SHORTCUT DEBUG] QKeySequence created: {key_sequence.toString()}")
+
+            shortcut = QShortcut(key_sequence, self)
+            # CRITICAL: Set context to ApplicationShortcut so it works even when panel is minimized
+            from PyQt6.QtCore import Qt
+            shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
+            logger.info(f"[SHORTCUT DEBUG] QShortcut object created with ApplicationShortcut context")
+            logger.info(f"[SHORTCUT DEBUG] Connecting to activation handler")
+            shortcut.activated.connect(lambda: self.on_panel_shortcut_activated(panel))
+
+            # Store references
+            self.panel_shortcuts[panel.panel_id] = shortcut
+            self.panel_by_shortcut[shortcut_str] = panel
+
+            logger.info(f"[SHORTCUT DEBUG] Successfully registered shortcut {shortcut_str} for panel {panel.panel_id}")
+            logger.info(f"[SHORTCUT DEBUG] Total registered shortcuts: {len(self.panel_shortcuts)}")
+            logger.info(f"[SHORTCUT DEBUG] Shortcuts dict: {list(self.panel_shortcuts.keys())}")
+        except Exception as e:
+            logger.error(f"[SHORTCUT DEBUG] Failed to register shortcut {shortcut_str}: {e}", exc_info=True)
+
+    def unregister_panel_shortcut(self, panel):
+        """
+        Unregister keyboard shortcut for a panel
+
+        Args:
+            panel: FloatingPanel instance
+        """
+        if not panel.panel_id:
+            return
+
+        try:
+            # Find and remove shortcut
+            if panel.panel_id in self.panel_shortcuts:
+                shortcut = self.panel_shortcuts[panel.panel_id]
+
+                # Find shortcut string to remove from lookup dict
+                shortcut_str = None
+                for key, value in self.panel_by_shortcut.items():
+                    if value == panel:
+                        shortcut_str = key
+                        break
+
+                # Disconnect and delete shortcut
+                shortcut.setEnabled(False)
+                shortcut.activated.disconnect()
+                del self.panel_shortcuts[panel.panel_id]
+
+                if shortcut_str:
+                    del self.panel_by_shortcut[shortcut_str]
+
+                logger.info(f"Unregistered shortcut for panel {panel.panel_id}")
+        except Exception as e:
+            logger.error(f"Failed to unregister shortcut for panel {panel.panel_id}: {e}", exc_info=True)
+
+    def on_panel_shortcut_activated(self, panel):
+        """
+        Handle keyboard shortcut activation - toggle panel minimize/maximize
+
+        Args:
+            panel: FloatingPanel instance
+        """
+        try:
+            logger.info(f"[SHORTCUT DEBUG] ========== SHORTCUT ACTIVATED ==========")
+            logger.info(f"[SHORTCUT DEBUG] Shortcut activated for panel {panel.panel_id}")
+            logger.info(f"[SHORTCUT DEBUG] Panel minimized state: {panel.is_minimized}")
+            logger.info(f"[SHORTCUT DEBUG] Panel visible: {panel.isVisible()}")
+
+            # Toggle minimize/maximize state
+            logger.info(f"[SHORTCUT DEBUG] Calling panel.toggle_minimize()")
+            panel.toggle_minimize()
+            logger.info(f"[SHORTCUT DEBUG] After toggle, minimized state: {panel.is_minimized}")
+
+            # Make sure panel is visible and on top
+            if not panel.isVisible():
+                logger.info(f"[SHORTCUT DEBUG] Panel not visible, showing it")
+                panel.show()
+            logger.info(f"[SHORTCUT DEBUG] Raising panel to front")
+            panel.raise_()
+            panel.activateWindow()
+            logger.info(f"[SHORTCUT DEBUG] ========== SHORTCUT ACTIVATION COMPLETE ==========")
+
+        except Exception as e:
+            logger.error(f"[SHORTCUT DEBUG] Error handling shortcut activation for panel {panel.panel_id}: {e}", exc_info=True)
 
     def open_pinned_panels_window(self):
         """Open the pinned panels management window"""
@@ -1031,6 +1186,10 @@ class MainWindow(QMainWindow):
 
                     # Update last_opened in database
                     self.controller.pinned_panels_manager.mark_panel_opened(panel_id)
+
+                    # Register keyboard shortcut if one is assigned
+                    if panel_data.get('keyboard_shortcut'):
+                        self.register_panel_shortcut(restored_panel, panel_data['keyboard_shortcut'])
 
                     # Show panel
                     restored_panel.show()

@@ -812,7 +812,7 @@ class DBManager:
     def save_pinned_panel(self, category_id: int, x_pos: int, y_pos: int,
                          width: int, height: int, is_minimized: bool = False,
                          custom_name: str = None, custom_color: str = None,
-                         filter_config: str = None) -> int:
+                         filter_config: str = None, keyboard_shortcut: str = None) -> int:
         """
         Save a pinned panel configuration to database
 
@@ -826,6 +826,7 @@ class DBManager:
             custom_name: Custom name for panel (optional)
             custom_color: Custom header color (optional, hex format)
             filter_config: Filter configuration as JSON string (optional)
+            keyboard_shortcut: Keyboard shortcut string like 'Ctrl+Shift+1' (optional)
 
         Returns:
             int: New panel ID
@@ -833,14 +834,14 @@ class DBManager:
         query = """
             INSERT INTO pinned_panels
             (category_id, x_position, y_position, width, height, is_minimized,
-             custom_name, custom_color, filter_config, is_active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+             custom_name, custom_color, filter_config, keyboard_shortcut, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         """
         panel_id = self.execute_update(
             query,
-            (category_id, x_pos, y_pos, width, height, is_minimized, custom_name, custom_color, filter_config)
+            (category_id, x_pos, y_pos, width, height, is_minimized, custom_name, custom_color, filter_config, keyboard_shortcut)
         )
-        logger.info(f"Pinned panel saved: Category {category_id} (ID: {panel_id})")
+        logger.info(f"Pinned panel saved: Category {category_id} (ID: {panel_id}, Shortcut: {keyboard_shortcut})")
         return panel_id
 
     def get_pinned_panels(self, active_only: bool = True) -> List[Dict]:
@@ -899,14 +900,15 @@ class DBManager:
         Args:
             panel_id: Panel ID to update
             **kwargs: Fields to update (x_position, y_position, width, height,
-                     is_minimized, custom_name, custom_color, filter_config, is_active)
+                     is_minimized, custom_name, custom_color, filter_config,
+                     keyboard_shortcut, is_active)
 
         Returns:
             bool: True if update successful
         """
         allowed_fields = [
             'x_position', 'y_position', 'width', 'height', 'is_minimized',
-            'custom_name', 'custom_color', 'filter_config', 'is_active'
+            'custom_name', 'custom_color', 'filter_config', 'keyboard_shortcut', 'is_active'
         ]
         updates = []
         params = []

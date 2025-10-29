@@ -4,7 +4,7 @@ Dialog to customize pinned panel name and color
 """
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QWidget, QColorDialog
+    QPushButton, QWidget, QColorDialog, QKeySequenceEdit
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QColor
@@ -16,22 +16,25 @@ logger = logging.getLogger(__name__)
 class PanelConfigDialog(QDialog):
     """Dialog for customizing pinned panel appearance"""
 
-    # Signal emitted when configuration is saved (custom_name, custom_color)
-    config_saved = pyqtSignal(str, str)
+    # Signal emitted when configuration is saved (custom_name, custom_color, keyboard_shortcut)
+    config_saved = pyqtSignal(str, str, str)
 
-    def __init__(self, current_name: str = "", current_color: str = "#007acc", category_name: str = "", parent=None):
+    def __init__(self, current_name: str = "", current_color: str = "#007acc",
+                 current_shortcut: str = "", category_name: str = "", parent=None):
         """
         Initialize the panel configuration dialog
 
         Args:
             current_name: Current custom name (empty if not set)
             current_color: Current custom color in hex format (default: #007acc)
+            current_shortcut: Current keyboard shortcut (e.g., 'Ctrl+Shift+1')
             category_name: Original category name (for reference)
             parent: Parent widget
         """
         super().__init__(parent)
         self.current_name = current_name
         self.current_color = current_color
+        self.current_shortcut = current_shortcut
         self.category_name = category_name
         self.selected_color = current_color  # Track selected color
         self.init_ui()
@@ -39,7 +42,7 @@ class PanelConfigDialog(QDialog):
     def init_ui(self):
         """Initialize UI"""
         self.setWindowTitle("Configurar Panel Anclado")
-        self.setFixedSize(450, 280)
+        self.setFixedSize(450, 370)
         self.setModal(True)
 
         # Apply dark theme styling
@@ -50,7 +53,7 @@ class PanelConfigDialog(QDialog):
             QLabel {
                 color: #ffffff;
             }
-            QLineEdit {
+            QLineEdit, QKeySequenceEdit {
                 background-color: #2d2d2d;
                 color: #ffffff;
                 border: 1px solid #3d3d3d;
@@ -58,7 +61,7 @@ class PanelConfigDialog(QDialog):
                 padding: 8px;
                 font-size: 10pt;
             }
-            QLineEdit:focus {
+            QLineEdit:focus, QKeySequenceEdit:focus {
                 border: 1px solid #007acc;
             }
             QPushButton {
@@ -143,6 +146,27 @@ class PanelConfigDialog(QDialog):
 
         main_layout.addLayout(color_row)
 
+        # Keyboard shortcut section
+        shortcut_label = QLabel("Atajo de teclado:")
+        shortcut_label.setStyleSheet("font-weight: bold;")
+        main_layout.addWidget(shortcut_label)
+
+        # Keyboard shortcut input with info
+        shortcut_row = QHBoxLayout()
+
+        self.shortcut_input = QKeySequenceEdit()
+        if self.current_shortcut:
+            from PyQt6.QtGui import QKeySequence
+            self.shortcut_input.setKeySequence(QKeySequence.fromString(self.current_shortcut))
+        shortcut_row.addWidget(self.shortcut_input)
+
+        # Info label
+        shortcut_info = QLabel("(Se asigna automáticamente si está vacío)")
+        shortcut_info.setStyleSheet("color: #999999; font-size: 8pt; font-style: italic;")
+        shortcut_row.addWidget(shortcut_info)
+
+        main_layout.addLayout(shortcut_row)
+
         main_layout.addStretch()
 
         # Button row
@@ -221,9 +245,10 @@ class PanelConfigDialog(QDialog):
             logger.info(f"Color selected: {self.selected_color}")
 
     def reset_defaults(self):
-        """Reset to default values (empty name, default color)"""
+        """Reset to default values (empty name, default color, empty shortcut)"""
         self.name_input.clear()
         self.selected_color = "#007acc"
+        self.shortcut_input.clear()
 
         # Update preview
         self.color_preview.setStyleSheet(f"""
@@ -243,11 +268,30 @@ class PanelConfigDialog(QDialog):
         """Save configuration and emit signal"""
         custom_name = self.name_input.text().strip()
         custom_color = self.selected_color
+        keyboard_shortcut = self.shortcut_input.keySequence().toString()
 
-        logger.info(f"Saving panel config - Name: '{custom_name}', Color: {custom_color}")
+        logger.info(f"[SHORTCUT DEBUG] Raw shortcut from QKeySequenceEdit: '{keyboard_shortcut}'")
+        logger.info(f"[SHORTCUT DEBUG] Has '+' character: {'+' in keyboard_shortcut}")
 
-        # Emit signal with values (empty string if no custom name)
-        self.config_saved.emit(custom_name, custom_color)
+        # Normalize keyboard shortcut - add Ctrl+ if no modifier present
+        if keyboard_shortcut:
+            # Check if shortcut has a modifier (contains '+' means it has Ctrl, Alt, Shift, etc.)
+            if '+' not in keyboard_shortcut:
+                # No modifier present, add Ctrl+ by default to avoid conflicts with system shortcuts
+                logger.info(f"[SHORTCUT DEBUG] No modifier found, adding Ctrl+ to '{keyboard_shortcut}'")
+                keyboard_shortcut = f"Ctrl+{keyboard_shortcut}"
+                logger.info(f"[SHORTCUT DEBUG] After adding Ctrl+: '{keyboard_shortcut}'")
+            else:
+                logger.info(f"[SHORTCUT DEBUG] Modifier already present in '{keyboard_shortcut}'")
+        else:
+            logger.info(f"[SHORTCUT DEBUG] Empty shortcut, not adding anything")
+
+        logger.info(f"[SHORTCUT DEBUG] Final shortcut to emit: '{keyboard_shortcut}'")
+        logger.info(f"Saving panel config - Name: '{custom_name}', Color: {custom_color}, Shortcut: '{keyboard_shortcut}'")
+
+        # Emit signal with values (empty string if no custom name/shortcut)
+        logger.info(f"[SHORTCUT DEBUG] Emitting config_saved signal with shortcut: '{keyboard_shortcut}'")
+        self.config_saved.emit(custom_name, custom_color, keyboard_shortcut)
 
         # Close dialog
         self.accept()

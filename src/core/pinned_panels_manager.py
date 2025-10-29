@@ -70,8 +70,35 @@ class PinnedPanelsManager:
             logger.error(f"Failed to parse filter config JSON: {e}")
             return None
 
+    def _get_next_available_shortcut(self) -> str:
+        """
+        Get next available keyboard shortcut for a panel
+
+        Returns:
+            str: Next available shortcut in format 'Ctrl+Shift+N' where N is 1-9
+        """
+        try:
+            # Get all existing shortcuts
+            all_panels = self.db.get_pinned_panels(active_only=False)
+            existing_shortcuts = {panel.get('keyboard_shortcut') for panel in all_panels if panel.get('keyboard_shortcut')}
+
+            # Try to assign shortcuts from Ctrl+Shift+1 to Ctrl+Shift+9
+            for i in range(1, 10):
+                shortcut = f"Ctrl+Shift+{i}"
+                if shortcut not in existing_shortcuts:
+                    logger.debug(f"Next available shortcut: {shortcut}")
+                    return shortcut
+
+            # If all 1-9 are taken, return None
+            logger.warning("All keyboard shortcuts (Ctrl+Shift+1-9) are already in use")
+            return None
+        except Exception as e:
+            logger.error(f"Error getting next available shortcut: {e}")
+            return None
+
     def save_panel_state(self, panel_widget, category_id: int,
-                        custom_name: str = None, custom_color: str = None) -> int:
+                        custom_name: str = None, custom_color: str = None,
+                        keyboard_shortcut: str = None) -> int:
         """
         Save current state of a FloatingPanel to database
 
@@ -80,11 +107,18 @@ class PinnedPanelsManager:
             category_id: ID of the category this panel displays
             custom_name: Custom name for the panel (optional)
             custom_color: Custom color for panel header (optional, hex format)
+            keyboard_shortcut: Keyboard shortcut (optional, auto-assigned if None)
 
         Returns:
             int: Panel ID in database
         """
         try:
+            # Auto-assign keyboard shortcut if not provided
+            if keyboard_shortcut is None:
+                keyboard_shortcut = self._get_next_available_shortcut()
+                if keyboard_shortcut:
+                    logger.info(f"Auto-assigned keyboard shortcut: {keyboard_shortcut}")
+
             # Serialize filter configuration
             filter_config = self._serialize_filter_config(panel_widget)
 
@@ -97,9 +131,10 @@ class PinnedPanelsManager:
                 is_minimized=getattr(panel_widget, 'is_minimized', False),
                 custom_name=custom_name,
                 custom_color=custom_color,
-                filter_config=filter_config
+                filter_config=filter_config,
+                keyboard_shortcut=keyboard_shortcut
             )
-            logger.info(f"Panel state saved for category {category_id} (Panel ID: {panel_id})")
+            logger.info(f"Panel state saved for category {category_id} (Panel ID: {panel_id}, Shortcut: {keyboard_shortcut})")
             return panel_id
         except Exception as e:
             logger.error(f"Failed to save panel state: {e}")
@@ -206,14 +241,15 @@ class PinnedPanelsManager:
             logger.error(f"Failed to cleanup panels on exit: {e}")
 
     def update_panel_customization(self, panel_id: int, custom_name: str = None,
-                                   custom_color: str = None):
+                                   custom_color: str = None, keyboard_shortcut: str = None):
         """
-        Update panel's custom name and/or color
+        Update panel's custom name, color, and/or keyboard shortcut
 
         Args:
             panel_id: Panel ID to update
             custom_name: New custom name (None to keep unchanged)
             custom_color: New custom color in hex format (None to keep unchanged)
+            keyboard_shortcut: New keyboard shortcut (None to keep unchanged)
         """
         try:
             kwargs = {}
@@ -221,6 +257,8 @@ class PinnedPanelsManager:
                 kwargs['custom_name'] = custom_name
             if custom_color is not None:
                 kwargs['custom_color'] = custom_color
+            if keyboard_shortcut is not None:
+                kwargs['keyboard_shortcut'] = keyboard_shortcut
 
             if kwargs:
                 self.db.update_pinned_panel(panel_id, **kwargs)
