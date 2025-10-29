@@ -2,7 +2,7 @@
 Floating Panel Window - Independent window for displaying category items
 """
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QPushButton, QComboBox
-from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QEvent
+from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QEvent, QTimer
 from PyQt6.QtGui import QFont, QCursor
 import sys
 import logging
@@ -33,7 +33,10 @@ class FloatingPanel(QWidget):
     # Signal emitted when pin state changes
     pin_state_changed = pyqtSignal(bool)  # True = pinned, False = unpinned
 
-    def __init__(self, config_manager=None, parent=None):
+    # Signal emitted when customization is requested
+    customization_requested = pyqtSignal()
+
+    def __init__(self, config_manager=None, panel_id=None, custom_name=None, custom_color=None, parent=None):
         super().__init__(parent)
         self.current_category = None
         self.config_manager = config_manager
@@ -48,6 +51,11 @@ class FloatingPanel(QWidget):
         self.normal_width = None  # Ancho normal antes de minimizar
         self.normal_position = None  # Posición normal antes de minimizar
 
+        # Panel persistence attributes
+        self.panel_id = panel_id  # ID del panel en la base de datos (None si no está guardado)
+        self.custom_name = custom_name  # Nombre personalizado del panel
+        self.custom_color = custom_color  # Color personalizado del header (hex format)
+
         # Get panel width from config
         if config_manager:
             self.panel_width = config_manager.get_setting('panel_width', 500)
@@ -59,6 +67,12 @@ class FloatingPanel(QWidget):
         self.resize_start_x = 0
         self.resize_start_width = 0
         self.resize_edge_width = 15  # Width of the resize edge in pixels (increased)
+
+        # AUTO-UPDATE: Timer for debounced panel state updates
+        self.update_timer = QTimer(self)
+        self.update_timer.setSingleShot(True)
+        self.update_timer.timeout.connect(self._save_panel_state_to_db)
+        self.update_delay_ms = 1000  # 1 second delay after move/resize
 
         self.init_ui()
 
@@ -186,6 +200,32 @@ class FloatingPanel(QWidget):
         self.minimize_button.clicked.connect(self.toggle_minimize)
         self.minimize_button.setVisible(False)  # Hidden by default (only show when pinned)
         self.header_layout.addWidget(self.minimize_button)
+
+        # Config button (only visible when pinned)
+        self.config_button = QPushButton("⚙")
+        self.config_button.setFixedSize(24, 24)
+        self.config_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.config_button.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.1);
+                color: #ffffff;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 12px;
+                font-size: 10pt;
+                padding: 0px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.4);
+            }
+            QPushButton:pressed {
+                background-color: rgba(255, 255, 255, 0.3);
+            }
+        """)
+        self.config_button.setToolTip("Configurar panel (nombre y color)")
+        self.config_button.clicked.connect(self.on_config_clicked)
+        self.config_button.setVisible(False)  # Hidden by default (only show when pinned)
+        self.header_layout.addWidget(self.config_button)
 
         # Close button
         close_button = QPushButton("✕")
@@ -447,6 +487,11 @@ class FloatingPanel(QWidget):
         current_query = self.search_bar.search_input.text()
         self.on_search_changed(current_query)
 
+        # AUTO-UPDATE: Trigger panel state save with new filters
+        if self.is_pinned and self.panel_id and self.config_manager:
+            self.update_timer.start(self.update_delay_ms)
+            logger.debug("Filter change triggered auto-save")
+
     def on_filters_cleared(self):
         """Handle cuando se limpian todos los filtros"""
         logger.info("All filters cleared")
@@ -455,6 +500,11 @@ class FloatingPanel(QWidget):
         # Re-aplicar búsqueda sin filtros
         current_query = self.search_bar.search_input.text()
         self.on_search_changed(current_query)
+
+        # AUTO-UPDATE: Trigger panel state save with cleared filters
+        if self.is_pinned and self.panel_id and self.config_manager:
+            self.update_timer.start(self.update_delay_ms)
+            logger.debug("Filter clear triggered auto-save")
 
     def on_state_filter_changed(self, index):
         """Handle cuando cambia el filtro de estado"""
@@ -465,6 +515,11 @@ class FloatingPanel(QWidget):
         # Re-aplicar búsqueda con nuevo filtro de estado
         current_query = self.search_bar.search_input.text()
         self.on_search_changed(current_query)
+
+        # AUTO-UPDATE: Trigger panel state save with new state filter
+        if self.is_pinned and self.panel_id and self.config_manager:
+            self.update_timer.start(self.update_delay_ms)
+            logger.debug("State filter change triggered auto-save")
 
     def filter_items_by_state(self, items):
         """Filtrar items por estado (activo/archivado)
@@ -489,6 +544,59 @@ class FloatingPanel(QWidget):
             return [item for item in items if not getattr(item, 'is_active', True)]
         else:
             return items
+
+    def apply_filter_config(self, filter_config: dict):
+        """Apply saved filter configuration to panel
+
+        Args:
+            filter_config: Dict with 'advanced_filters', 'state_filter', and 'search_text'
+        """
+        if not filter_config:
+            logger.debug("No filter config to apply")
+            return
+
+        try:
+            logger.info(f"Applying filter configuration: {filter_config}")
+
+            # Apply advanced filters
+            if 'advanced_filters' in filter_config:
+                self.current_filters = filter_config['advanced_filters']
+                logger.debug(f"Applied advanced filters: {self.current_filters}")
+
+            # Apply state filter and update combo box
+            if 'state_filter' in filter_config:
+                state_filter = filter_config['state_filter']
+                self.current_state_filter = state_filter
+
+                # Update combo box to match (without triggering signal)
+                state_index_map = {
+                    'normal': 0,
+                    'archived': 1,
+                    'inactive': 2,
+                    'all': 3
+                }
+                if state_filter in state_index_map:
+                    self.state_filter_combo.blockSignals(True)
+                    self.state_filter_combo.setCurrentIndex(state_index_map[state_filter])
+                    self.state_filter_combo.blockSignals(False)
+                    logger.debug(f"Applied state filter: {state_filter}")
+
+            # Apply search text and update search bar
+            if 'search_text' in filter_config:
+                search_text = filter_config['search_text']
+                if search_text:
+                    self.search_bar.search_input.blockSignals(True)
+                    self.search_bar.search_input.setText(search_text)
+                    self.search_bar.search_input.blockSignals(False)
+                    logger.debug(f"Applied search text: {search_text}")
+
+            # Trigger filter application
+            current_query = self.search_bar.search_input.text()
+            self.on_search_changed(current_query)
+
+            logger.info("Filter configuration applied successfully")
+        except Exception as e:
+            logger.error(f"Error applying filter config: {e}", exc_info=True)
 
     def position_near_sidebar(self, sidebar_window):
         """Position the floating panel near the sidebar window"""
@@ -606,8 +714,9 @@ class FloatingPanel(QWidget):
             """)
             self.pin_button.setToolTip("Desanclar panel")
 
-            # Show minimize button when pinned
+            # Show minimize and config buttons when pinned
             self.minimize_button.setVisible(True)
+            self.config_button.setVisible(True)
             logger.info(f"Panel '{self.header_label.text()}' ANCLADO - puede abrir otros paneles")
         else:
             self.pin_button.setText("📌")  # Unpinned icon
@@ -630,8 +739,9 @@ class FloatingPanel(QWidget):
             """)
             self.pin_button.setToolTip("Anclar panel (permite abrir múltiples paneles)")
 
-            # Hide minimize button when unpinned
+            # Hide minimize and config buttons when unpinned
             self.minimize_button.setVisible(False)
+            self.config_button.setVisible(False)
 
             # If panel was minimized, restore it before unpinning
             if self.is_minimized:
@@ -726,6 +836,63 @@ class FloatingPanel(QWidget):
             self.minimize_button.setToolTip("Minimizar panel")
             logger.info(f"Panel '{self.header_label.text()}' MAXIMIZADO")
 
+    def apply_custom_styling(self):
+        """Apply custom color to panel header if custom_color is set"""
+        if self.custom_color:
+            self.header_widget.setStyleSheet(f"""
+                QWidget {{
+                    background-color: {self.custom_color};
+                    border-radius: 6px 6px 0 0;
+                }}
+            """)
+            logger.info(f"Applied custom color to panel: {self.custom_color}")
+        else:
+            # Restore default styling
+            self.header_widget.setStyleSheet("""
+                QWidget {
+                    background-color: #007acc;
+                    border-radius: 6px 6px 0 0;
+                }
+            """)
+            logger.debug("Restored default header color")
+
+    def get_display_name(self) -> str:
+        """Get name to display in header (custom name takes priority over category name)"""
+        if self.custom_name:
+            return self.custom_name
+        elif self.current_category:
+            return self.current_category.name
+        else:
+            return "Select a category"
+
+    def update_header_title(self):
+        """Update the header label with current display name"""
+        display_name = self.get_display_name()
+        self.header_label.setText(display_name)
+        logger.debug(f"Updated header title to: {display_name}")
+
+    def update_customization(self, custom_name: str = None, custom_color: str = None):
+        """Update panel customization (name and/or color)
+
+        Args:
+            custom_name: New custom name (None to keep unchanged)
+            custom_color: New custom color in hex format (None to keep unchanged)
+        """
+        if custom_name is not None:
+            self.custom_name = custom_name
+            self.update_header_title()
+            logger.info(f"Updated panel custom name to: {custom_name}")
+
+        if custom_color is not None:
+            self.custom_color = custom_color
+            self.apply_custom_styling()
+            logger.info(f"Updated panel custom color to: {custom_color}")
+
+    def on_config_clicked(self):
+        """Handle config button click - emit signal for parent to handle"""
+        logger.info(f"Config button clicked for panel: {self.get_display_name()}")
+        self.customization_requested.emit()
+
     def closeEvent(self, event):
         """Handle window close event"""
         # Cerrar también la ventana de filtros si está abierta
@@ -734,3 +901,58 @@ class FloatingPanel(QWidget):
 
         self.window_closed.emit()
         event.accept()
+
+    def moveEvent(self, event):
+        """AUTO-UPDATE: Handle window move event - save position to database (debounced)"""
+        super().moveEvent(event)
+
+        # Only save if this is a pinned panel with a panel_id
+        if self.is_pinned and self.panel_id and self.config_manager:
+            # Restart the debounce timer
+            self.update_timer.start(self.update_delay_ms)
+
+    def resizeEvent(self, event):
+        """AUTO-UPDATE: Handle window resize event - save size to database (debounced)"""
+        super().resizeEvent(event)
+
+        # Only save if this is a pinned panel with a panel_id
+        if self.is_pinned and self.panel_id and self.config_manager:
+            # Restart the debounce timer
+            self.update_timer.start(self.update_delay_ms)
+
+    def _save_panel_state_to_db(self):
+        """AUTO-UPDATE: Save current panel state (position/size) to database"""
+        # Only save if this is a pinned panel with a valid panel_id
+        if not self.is_pinned or not self.panel_id or not self.config_manager:
+            return
+
+        try:
+            # Get PinnedPanelsManager from main_window via parent chain
+            from views.main_window import MainWindow
+
+            # Find MainWindow in parent chain
+            main_window = None
+            parent = self.parent()
+            while parent:
+                if isinstance(parent, MainWindow):
+                    main_window = parent
+                    break
+                parent = parent.parent()
+
+            if not main_window or not main_window.controller:
+                logger.warning("Could not find MainWindow or controller - skipping panel state save")
+                return
+
+            # Get the PinnedPanelsManager
+            panels_manager = main_window.controller.pinned_panels_manager
+
+            # Update panel state in database
+            panels_manager.update_panel_state(
+                panel_id=self.panel_id,
+                panel_widget=self
+            )
+
+            logger.debug(f"Panel {self.panel_id} state auto-saved to database (Position: {self.pos()}, Size: {self.size()})")
+
+        except Exception as e:
+            logger.error(f"Error auto-saving panel state: {e}", exc_info=True)

@@ -16,10 +16,12 @@ from views.global_search_panel import GlobalSearchPanel
 from views.favorites_floating_panel import FavoritesFloatingPanel
 from views.stats_floating_panel import StatsFloatingPanel
 from views.settings_window import SettingsWindow
+from views.pinned_panels_window import PinnedPanelsWindow
 from views.dialogs.popular_items_dialog import PopularItemsDialog
 from views.dialogs.forgotten_items_dialog import ForgottenItemsDialog
 from views.dialogs.suggestions_dialog import FavoriteSuggestionsDialog
 from views.dialogs.stats_dashboard import StatsDashboard
+from views.dialogs.panel_config_dialog import PanelConfigDialog
 from views.category_filter_window import CategoryFilterWindow
 from models.item import Item
 from core.hotkey_manager import HotkeyManager
@@ -45,6 +47,7 @@ class MainWindow(QMainWindow):
         self.sidebar = None
         self.floating_panel = None  # Panel flotante activo (no anclado) - compatibility
         self.pinned_panels = []  # Lista de paneles anclados
+        self.pinned_panels_window = None  # Ventana de gestión de paneles anclados
         self.global_search_panel = None  # Ventana flotante para búsqueda global
         self.favorites_panel = None  # Ventana flotante para favoritos
         self.stats_panel = None  # Ventana flotante para estadísticas
@@ -65,6 +68,9 @@ class MainWindow(QMainWindow):
         self.setup_hotkeys()
         self.setup_tray()
         self.check_notifications_delayed()
+
+        # AUTO-RESTORE: Restore pinned panels from database on startup
+        self.restore_pinned_panels_on_startup()
 
     def init_ui(self):
         """Initialize the user interface"""
@@ -214,6 +220,7 @@ class MainWindow(QMainWindow):
                         self.floating_panel.item_clicked.connect(self.on_item_clicked)
                         self.floating_panel.window_closed.connect(self.on_floating_panel_closed)
                         self.floating_panel.pin_state_changed.connect(self.on_panel_pin_changed)
+                        self.floating_panel.customization_requested.connect(self.on_panel_customization_requested)
                         logger.debug("New floating panel created")
 
                     # Load category into floating panel
@@ -272,6 +279,27 @@ class MainWindow(QMainWindow):
             # Panel was just pinned
             if sender_panel == self.floating_panel:
                 logger.info("Active panel was pinned - will create new panel on next category click")
+
+            # AUTO-SAVE: Save panel to database when pinned
+            if sender_panel.current_category and self.controller:
+                try:
+                    category_id = sender_panel.current_category.id
+
+                    # Save panel state to database
+                    panel_id = self.controller.pinned_panels_manager.save_panel_state(
+                        panel_widget=sender_panel,
+                        category_id=category_id,
+                        custom_name=sender_panel.custom_name,
+                        custom_color=sender_panel.custom_color
+                    )
+
+                    # Store panel_id in the FloatingPanel instance
+                    sender_panel.panel_id = panel_id
+
+                    logger.info(f"Panel auto-saved to database with ID: {panel_id} (Category: {sender_panel.current_category.name})")
+
+                except Exception as e:
+                    logger.error(f"Error auto-saving panel: {e}", exc_info=True)
         else:
             # Panel was unpinned
             if sender_panel in self.pinned_panels:
@@ -571,6 +599,7 @@ class MainWindow(QMainWindow):
         self.tray_manager.stats_dashboard_requested.connect(self.show_stats_dashboard)
         self.tray_manager.popular_items_requested.connect(self.show_popular_items)
         self.tray_manager.forgotten_items_requested.connect(self.show_forgotten_items)
+        self.tray_manager.pinned_panels_requested.connect(self.open_pinned_panels_window)
         self.tray_manager.logout_requested.connect(self.logout_session)
         self.tray_manager.quit_requested.connect(self.quit_application)
 
@@ -851,6 +880,269 @@ class MainWindow(QMainWindow):
         """Handler cuando se selecciona un item popular"""
         logger.info(f"Popular item selected: {item_id}")
         # TODO: Abrir el item o mostrarlo en la lista principal
+
+    def on_panel_customization_requested(self):
+        """Handle customization request from a pinned panel"""
+        sender_panel = self.sender()
+        logger.info(f"Customization requested for panel: {sender_panel.get_display_name()}")
+
+        # Get current values
+        current_name = sender_panel.custom_name or ""
+        current_color = sender_panel.custom_color or "#007acc"
+        category_name = sender_panel.current_category.name if sender_panel.current_category else ""
+
+        # Open config dialog
+        dialog = PanelConfigDialog(
+            current_name=current_name,
+            current_color=current_color,
+            category_name=category_name,
+            parent=self
+        )
+
+        # Connect save signal
+        dialog.config_saved.connect(lambda name, color: self.on_panel_customized(sender_panel, name, color))
+
+        # Show dialog
+        dialog.exec()
+
+    def on_panel_customized(self, panel, custom_name: str, custom_color: str):
+        """Handle panel customization save"""
+        logger.info(f"Applying customization - Name: '{custom_name}', Color: {custom_color}")
+
+        # Update panel appearance
+        panel.update_customization(custom_name=custom_name, custom_color=custom_color)
+
+        # If panel has panel_id (saved in database), update there too
+        if panel.panel_id and self.controller:
+            self.controller.pinned_panels_manager.update_panel_customization(
+                panel_id=panel.panel_id,
+                custom_name=custom_name if custom_name else None,
+                custom_color=custom_color
+            )
+            logger.info(f"Updated panel {panel.panel_id} in database")
+
+    def open_pinned_panels_window(self):
+        """Open the pinned panels management window"""
+        if not self.controller:
+            logger.error("No controller available")
+            return
+
+        # Create window if doesn't exist
+        if not self.pinned_panels_window:
+            self.pinned_panels_window = PinnedPanelsWindow(
+                panels_manager=self.controller.pinned_panels_manager,
+                parent=self
+            )
+            # Connect signals
+            self.pinned_panels_window.panel_open_requested.connect(self.on_restore_panel_requested)
+            self.pinned_panels_window.panel_deleted.connect(self.on_panel_deleted_from_window)
+            self.pinned_panels_window.panel_updated.connect(self.on_panel_updated_from_window)
+            logger.debug("Pinned panels window created")
+
+        # Show and raise window
+        self.pinned_panels_window.show()
+        self.pinned_panels_window.raise_()
+        self.pinned_panels_window.activateWindow()
+        logger.info("Pinned panels window opened")
+
+    def restore_pinned_panels_on_startup(self):
+        """AUTO-RESTORE: Restore active pinned panels from database on application startup"""
+        if not self.controller:
+            logger.warning("No controller available - skipping panel restoration")
+            return
+
+        try:
+            # Get all active panels from database
+            active_panels = self.controller.pinned_panels_manager.restore_panels_on_startup()
+
+            if not active_panels:
+                logger.info("No active panels to restore")
+                return
+
+            logger.info(f"Restoring {len(active_panels)} active panels from database...")
+
+            # Restore each panel
+            for panel_data in active_panels:
+                try:
+                    panel_id = panel_data['id']
+                    category_id = panel_data['category_id']
+
+                    # Get category
+                    category = self.controller.get_category(str(category_id))
+                    if not category:
+                        logger.warning(f"Category {category_id} not found for panel {panel_id} - skipping")
+                        continue
+
+                    # Create new floating panel with saved configuration
+                    restored_panel = FloatingPanel(
+                        config_manager=self.config_manager,
+                        panel_id=panel_id,
+                        custom_name=panel_data.get('custom_name'),
+                        custom_color=panel_data.get('custom_color')
+                    )
+
+                    # Connect signals
+                    restored_panel.item_clicked.connect(self.on_item_clicked)
+                    restored_panel.window_closed.connect(self.on_floating_panel_closed)
+                    restored_panel.pin_state_changed.connect(self.on_panel_pin_changed)
+                    restored_panel.customization_requested.connect(self.on_panel_customization_requested)
+
+                    # Load category
+                    restored_panel.load_category(category)
+
+                    # Restore position and size
+                    restored_panel.move(panel_data['x_position'], panel_data['y_position'])
+                    restored_panel.resize(panel_data['width'], panel_data['height'])
+
+                    # Apply custom styling
+                    restored_panel.apply_custom_styling()
+
+                    # Set as pinned
+                    restored_panel.is_pinned = True
+                    restored_panel.pin_button.setText("📍")
+                    restored_panel.minimize_button.setVisible(True)
+                    restored_panel.config_button.setVisible(True)
+
+                    # Restore minimized state if needed
+                    if panel_data.get('is_minimized'):
+                        restored_panel.toggle_minimize()
+
+                    # Restore filter configuration if available
+                    if panel_data.get('filter_config'):
+                        filter_config = self.controller.pinned_panels_manager._deserialize_filter_config(
+                            panel_data['filter_config']
+                        )
+                        if filter_config:
+                            restored_panel.apply_filter_config(filter_config)
+                            logger.debug(f"Applied saved filters to panel {panel_id}")
+
+                    # Add to pinned panels list
+                    self.pinned_panels.append(restored_panel)
+
+                    # Update last_opened in database
+                    self.controller.pinned_panels_manager.mark_panel_opened(panel_id)
+
+                    # Show panel
+                    restored_panel.show()
+
+                    logger.info(f"Panel {panel_id} (Category: {category.name}) restored successfully")
+
+                except Exception as e:
+                    logger.error(f"Error restoring panel {panel_data.get('id', 'unknown')}: {e}", exc_info=True)
+                    continue
+
+            logger.info(f"Panel restoration complete: {len(self.pinned_panels)}/{len(active_panels)} panels restored")
+
+        except Exception as e:
+            logger.error(f"Error during panel restoration on startup: {e}", exc_info=True)
+
+    def on_restore_panel_requested(self, panel_id: int):
+        """Handle request to restore/open a saved panel"""
+        logger.info(f"Restore panel requested: {panel_id}")
+
+        if not self.controller:
+            logger.error("No controller available")
+            return
+
+        # Get panel data from database
+        panel_data = self.controller.pinned_panels_manager.get_panel_by_id(panel_id)
+        if not panel_data:
+            logger.error(f"Panel {panel_id} not found in database")
+            QMessageBox.warning(
+                self,
+                "Error",
+                f"Panel {panel_id} no encontrado en la base de datos"
+            )
+            return
+
+        # Get category
+        category = self.controller.get_category(str(panel_data['category_id']))
+        if not category:
+            logger.error(f"Category {panel_data['category_id']} not found")
+            QMessageBox.warning(
+                self,
+                "Error",
+                f"Categoria {panel_data['category_id']} no encontrada"
+            )
+            return
+
+        # Create new floating panel with saved configuration
+        restored_panel = FloatingPanel(
+            config_manager=self.config_manager,
+            panel_id=panel_id,
+            custom_name=panel_data.get('custom_name'),
+            custom_color=panel_data.get('custom_color')
+        )
+
+        # Connect signals
+        restored_panel.item_clicked.connect(self.on_item_clicked)
+        restored_panel.window_closed.connect(self.on_floating_panel_closed)
+        restored_panel.pin_state_changed.connect(self.on_panel_pin_changed)
+        restored_panel.customization_requested.connect(self.on_panel_customization_requested)
+
+        # Load category
+        restored_panel.load_category(category)
+
+        # Restore position and size
+        restored_panel.move(panel_data['x_position'], panel_data['y_position'])
+        restored_panel.resize(panel_data['width'], panel_data['height'])
+
+        # Apply custom styling
+        restored_panel.apply_custom_styling()
+
+        # Set as pinned
+        restored_panel.is_pinned = True
+        restored_panel.pin_button.setText("📍")
+        restored_panel.minimize_button.setVisible(True)
+        restored_panel.config_button.setVisible(True)
+
+        # Restore minimized state if needed
+        if panel_data.get('is_minimized'):
+            restored_panel.toggle_minimize()
+
+        # Restore filter configuration if available
+        if panel_data.get('filter_config'):
+            filter_config = self.controller.pinned_panels_manager._deserialize_filter_config(
+                panel_data['filter_config']
+            )
+            if filter_config:
+                restored_panel.apply_filter_config(filter_config)
+                logger.debug(f"Applied saved filters to panel {panel_id}")
+
+        # Add to pinned panels list
+        self.pinned_panels.append(restored_panel)
+
+        # Update last_opened in database
+        self.controller.pinned_panels_manager.mark_panel_opened(panel_id)
+
+        # Show panel
+        restored_panel.show()
+
+        logger.info(f"Panel {panel_id} restored successfully")
+
+    def on_panel_deleted_from_window(self, panel_id: int):
+        """Handle panel deletion from management window"""
+        logger.info(f"Panel {panel_id} deleted from window - checking if currently open")
+
+        # Check if this panel is currently open and close it
+        for panel in self.pinned_panels[:]:
+            if panel.panel_id == panel_id:
+                logger.info(f"Closing currently open panel {panel_id}")
+                self.pinned_panels.remove(panel)
+                panel.close()
+                panel.deleteLater()
+                break
+
+    def on_panel_updated_from_window(self, panel_id: int, custom_name: str, custom_color: str):
+        """Handle panel update from management window"""
+        logger.info(f"Panel {panel_id} updated from window")
+
+        # Update currently open panel if found
+        for panel in self.pinned_panels:
+            if panel.panel_id == panel_id:
+                logger.info(f"Updating currently open panel {panel_id}")
+                panel.update_customization(custom_name=custom_name, custom_color=custom_color)
+                break
 
     def closeEvent(self, event):
         """Override close event to minimize to tray instead of closing"""

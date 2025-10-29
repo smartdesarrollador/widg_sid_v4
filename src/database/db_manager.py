@@ -147,11 +147,32 @@ class DBManager:
                 FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL
             );
 
+            -- Tabla de paneles anclados (pinned panels)
+            CREATE TABLE IF NOT EXISTS pinned_panels (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category_id INTEGER NOT NULL,
+                custom_name TEXT,
+                custom_color TEXT,
+                x_position INTEGER NOT NULL,
+                y_position INTEGER NOT NULL,
+                width INTEGER NOT NULL DEFAULT 350,
+                height INTEGER NOT NULL DEFAULT 500,
+                is_minimized BOOLEAN DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_opened TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                open_count INTEGER DEFAULT 0,
+                is_active BOOLEAN DEFAULT 1,
+                FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+            );
+
             -- Índices para optimización
             CREATE INDEX IF NOT EXISTS idx_categories_order ON categories(order_index);
             CREATE INDEX IF NOT EXISTS idx_items_category ON items(category_id);
             CREATE INDEX IF NOT EXISTS idx_items_last_used ON items(last_used DESC);
             CREATE INDEX IF NOT EXISTS idx_clipboard_history_date ON clipboard_history(copied_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_pinned_category ON pinned_panels(category_id);
+            CREATE INDEX IF NOT EXISTS idx_pinned_last_opened ON pinned_panels(last_opened DESC);
+            CREATE INDEX IF NOT EXISTS idx_pinned_active ON pinned_panels(is_active);
 
             -- Configuración inicial por defecto
             INSERT OR IGNORE INTO settings (key, value) VALUES
@@ -785,6 +806,203 @@ class DBManager:
         """
         self.execute_update(query, (keep_latest,))
         logger.debug(f"History trimmed to {keep_latest} entries")
+
+    # ========== PINNED PANELS ==========
+
+    def save_pinned_panel(self, category_id: int, x_pos: int, y_pos: int,
+                         width: int, height: int, is_minimized: bool = False,
+                         custom_name: str = None, custom_color: str = None,
+                         filter_config: str = None) -> int:
+        """
+        Save a pinned panel configuration to database
+
+        Args:
+            category_id: Category ID for this panel
+            x_pos: X position on screen
+            y_pos: Y position on screen
+            width: Panel width
+            height: Panel height
+            is_minimized: Whether panel is minimized
+            custom_name: Custom name for panel (optional)
+            custom_color: Custom header color (optional, hex format)
+            filter_config: Filter configuration as JSON string (optional)
+
+        Returns:
+            int: New panel ID
+        """
+        query = """
+            INSERT INTO pinned_panels
+            (category_id, x_position, y_position, width, height, is_minimized,
+             custom_name, custom_color, filter_config, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        """
+        panel_id = self.execute_update(
+            query,
+            (category_id, x_pos, y_pos, width, height, is_minimized, custom_name, custom_color, filter_config)
+        )
+        logger.info(f"Pinned panel saved: Category {category_id} (ID: {panel_id})")
+        return panel_id
+
+    def get_pinned_panels(self, active_only: bool = True) -> List[Dict]:
+        """
+        Retrieve all pinned panels
+
+        Args:
+            active_only: Only return panels marked as active
+
+        Returns:
+            List[Dict]: List of panel dictionaries with category info
+        """
+        if active_only:
+            query = """
+                SELECT p.*, c.name as category_name, c.icon as category_icon
+                FROM pinned_panels p
+                JOIN categories c ON p.category_id = c.id
+                WHERE p.is_active = 1
+                ORDER BY p.last_opened DESC
+            """
+            panels = self.execute_query(query)
+        else:
+            query = """
+                SELECT p.*, c.name as category_name, c.icon as category_icon
+                FROM pinned_panels p
+                JOIN categories c ON p.category_id = c.id
+                ORDER BY p.last_opened DESC
+            """
+            panels = self.execute_query(query)
+        logger.debug(f"Retrieved {len(panels)} pinned panels (active_only={active_only})")
+        return panels
+
+    def get_panel_by_id(self, panel_id: int) -> Optional[Dict]:
+        """
+        Get specific panel by ID
+
+        Args:
+            panel_id: Panel ID
+
+        Returns:
+            Optional[Dict]: Panel dictionary with category info, or None
+        """
+        query = """
+            SELECT p.*, c.name as category_name, c.icon as category_icon
+            FROM pinned_panels p
+            JOIN categories c ON p.category_id = c.id
+            WHERE p.id = ?
+        """
+        result = self.execute_query(query, (panel_id,))
+        return result[0] if result else None
+
+    def update_pinned_panel(self, panel_id: int, **kwargs) -> bool:
+        """
+        Update panel configuration
+
+        Args:
+            panel_id: Panel ID to update
+            **kwargs: Fields to update (x_position, y_position, width, height,
+                     is_minimized, custom_name, custom_color, filter_config, is_active)
+
+        Returns:
+            bool: True if update successful
+        """
+        allowed_fields = [
+            'x_position', 'y_position', 'width', 'height', 'is_minimized',
+            'custom_name', 'custom_color', 'filter_config', 'is_active'
+        ]
+        updates = []
+        params = []
+
+        for field, value in kwargs.items():
+            if field in allowed_fields:
+                updates.append(f"{field} = ?")
+                params.append(value)
+
+        if updates:
+            params.append(panel_id)
+            query = f"UPDATE pinned_panels SET {', '.join(updates)} WHERE id = ?"
+            self.execute_update(query, tuple(params))
+            logger.info(f"Pinned panel updated: ID {panel_id}")
+            return True
+        return False
+
+    def update_panel_last_opened(self, panel_id: int) -> None:
+        """
+        Update last_opened timestamp and increment open_count
+
+        Args:
+            panel_id: Panel ID
+        """
+        query = """
+            UPDATE pinned_panels
+            SET last_opened = CURRENT_TIMESTAMP,
+                open_count = open_count + 1
+            WHERE id = ?
+        """
+        self.execute_update(query, (panel_id,))
+        logger.debug(f"Panel {panel_id} opened - statistics updated")
+
+    def delete_pinned_panel(self, panel_id: int) -> bool:
+        """
+        Remove a pinned panel from database
+
+        Args:
+            panel_id: Panel ID to delete
+
+        Returns:
+            bool: True if deletion successful
+        """
+        query = "DELETE FROM pinned_panels WHERE id = ?"
+        self.execute_update(query, (panel_id,))
+        logger.info(f"Pinned panel deleted: ID {panel_id}")
+        return True
+
+    def get_recent_panels(self, limit: int = 10) -> List[Dict]:
+        """
+        Get recently opened panels ordered by last_opened DESC
+
+        Args:
+            limit: Maximum number of panels to return
+
+        Returns:
+            List[Dict]: List of panel dictionaries with category info
+        """
+        query = """
+            SELECT p.*, c.name as category_name, c.icon as category_icon
+            FROM pinned_panels p
+            JOIN categories c ON p.category_id = c.id
+            ORDER BY p.last_opened DESC
+            LIMIT ?
+        """
+        panels = self.execute_query(query, (limit,))
+        logger.debug(f"Retrieved {len(panels)} recent panels")
+        return panels
+
+    def deactivate_all_panels(self) -> None:
+        """
+        Set is_active=0 for all panels (called on app shutdown)
+        """
+        query = "UPDATE pinned_panels SET is_active = 0"
+        self.execute_update(query)
+        logger.info("All pinned panels marked as inactive")
+
+    def get_panel_by_category(self, category_id: int) -> Optional[Dict]:
+        """
+        Check if an active panel for this category already exists
+
+        Args:
+            category_id: Category ID
+
+        Returns:
+            Optional[Dict]: Panel dictionary if exists, None otherwise
+        """
+        query = """
+            SELECT p.*, c.name as category_name, c.icon as category_icon
+            FROM pinned_panels p
+            JOIN categories c ON p.category_id = c.id
+            WHERE p.category_id = ? AND p.is_active = 1
+            LIMIT 1
+        """
+        result = self.execute_query(query, (category_id,))
+        return result[0] if result else None
 
     def __enter__(self):
         """Context manager entry"""

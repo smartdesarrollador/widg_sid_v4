@@ -22,6 +22,7 @@ class TrayManager(QObject):
     stats_dashboard_requested = pyqtSignal()
     popular_items_requested = pyqtSignal()
     forgotten_items_requested = pyqtSignal()
+    pinned_panels_requested = pyqtSignal()
     logout_requested = pyqtSignal()
     quit_requested = pyqtSignal()
 
@@ -116,6 +117,14 @@ class TrayManager(QObject):
         # Separator
         self.tray_menu.addSeparator()
 
+        # Pinned panels action
+        pinned_panels_action = QAction("📌 Gestionar Paneles Anclados", self.tray_menu)
+        pinned_panels_action.triggered.connect(self._on_pinned_panels)
+        self.tray_menu.addAction(pinned_panels_action)
+
+        # Separator
+        self.tray_menu.addSeparator()
+
         # Logout action
         logout_action = QAction("🔒 Cerrar Sesión", self.tray_menu)
         logout_action.triggered.connect(self._on_logout)
@@ -170,6 +179,10 @@ class TrayManager(QObject):
     def _on_forgotten_items(self):
         """Handle forgotten items menu action"""
         self.forgotten_items_requested.emit()
+
+    def _on_pinned_panels(self):
+        """Handle pinned panels menu action"""
+        self.pinned_panels_requested.emit()
 
     def _on_logout(self):
         """Handle logout menu action"""

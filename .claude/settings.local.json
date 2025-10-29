@@ -27,7 +27,8 @@
       "Bash(if not exist \"C:\\Users\\ASUS\\Desktop\\proyectos_python\\widget_sidebar\\src\\views\\dialogs\" mkdir \"C:\\Users\\ASUS\\Desktop\\proyectos_python\\widget_sidebar\\src\\views\\dialogs\")",
       "Bash(python:*)",
       "Bash(timeout /t 3:*)",
-      "Bash(if not exist \"C:\\Users\\ASUS\\Desktop\\proyectos_python\\widget_sidebar\\util\\migrations\" mkdir \"C:\\Users\\ASUS\\Desktop\\proyectos_python\\widget_sidebar\\util\\migrations\")"
+      "Bash(if not exist \"C:\\Users\\ASUS\\Desktop\\proyectos_python\\widget_sidebar\\util\\migrations\" mkdir \"C:\\Users\\ASUS\\Desktop\\proyectos_python\\widget_sidebar\\util\\migrations\")",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from core.config_manager import ConfigManager
 from core.clipboard_manager import ClipboardManager
 from core.category_filter_engine import CategoryFilterEngine
+from core.pinned_panels_manager import PinnedPanelsManager
 from controllers.clipboard_controller import ClipboardController
 from models.category import Category
 from models.item import Item
@@ -25,6 +26,7 @@ class MainController:
         self.config_manager = ConfigManager(db_path="widget_sidebar.db")
         self.clipboard_manager = ClipboardManager()
         self.category_filter_engine = CategoryFilterEngine(db_path="widget_sidebar.db")
+        self.pinned_panels_manager = PinnedPanelsManager(self.config_manager.db)
 
         # Initialize controllers
         self.clipboard_controller = ClipboardController(self.clipboard_manager)
