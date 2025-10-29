@@ -312,6 +312,16 @@ class MainWindow(QMainWindow):
                 self.floating_panel = sender_panel
                 logger.info(f"Panel unpinned and became active panel. Remaining pinned: {len(self.pinned_panels)}")
 
+            # Delete panel from database if it was saved
+            if sender_panel.panel_id and self.controller:
+                try:
+                    self.controller.pinned_panels_manager.delete_panel(sender_panel.panel_id)
+                    logger.info(f"Panel {sender_panel.panel_id} deleted from database on unpin")
+                    # Clear panel_id so it won't try to update anymore
+                    sender_panel.panel_id = None
+                except Exception as e:
+                    logger.error(f"Error deleting panel from database on unpin: {e}", exc_info=True)
+
     def position_new_panel(self, panel):
         """Position a new panel always at the same initial position (next to sidebar)"""
         # Calculate base position (next to sidebar) - always the same position
