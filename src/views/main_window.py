@@ -179,6 +179,7 @@ class MainWindow(QMainWindow):
         self.sidebar.global_search_clicked.connect(self.on_global_search_clicked)
         self.sidebar.favorites_clicked.connect(self.on_favorites_clicked)
         self.sidebar.stats_clicked.connect(self.on_stats_clicked)
+        self.sidebar.dashboard_clicked.connect(self.open_structure_dashboard)
         self.sidebar.settings_clicked.connect(self.open_settings)
         self.sidebar.category_filter_clicked.connect(self.on_category_filter_clicked)
         main_layout.addWidget(self.sidebar)
@@ -492,6 +493,38 @@ class MainWindow(QMainWindow):
         if self.stats_panel:
             self.stats_panel.deleteLater()
             self.stats_panel = None
+
+    def open_structure_dashboard(self):
+        """Open the structure dashboard"""
+        try:
+            logger.info("Opening structure dashboard...")
+
+            if not self.controller:
+                logger.error("No controller available")
+                QMessageBox.warning(
+                    self,
+                    "Error",
+                    "No hay controlador disponible"
+                )
+                return
+
+            from views.dashboard.structure_dashboard import StructureDashboard
+
+            dashboard = StructureDashboard(
+                db_manager=self.controller.config_manager.db,
+                parent=self
+            )
+            dashboard.exec()  # Modal dialog
+
+            logger.info("Structure dashboard closed")
+
+        except Exception as e:
+            logger.error(f"Error opening structure dashboard: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al abrir dashboard de estructura:\n{str(e)}"
+            )
 
     def on_category_filter_clicked(self):
         """Handle category filter button click - show filter window"""

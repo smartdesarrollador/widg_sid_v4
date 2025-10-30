@@ -28,6 +28,9 @@ class Sidebar(QWidget):
     # Signal emitted when stats button is clicked
     stats_clicked = pyqtSignal()
 
+    # Signal emitted when dashboard button is clicked
+    dashboard_clicked = pyqtSignal()
+
     # Signal emitted when category filter button is clicked
     category_filter_clicked = pyqtSignal()
 
@@ -282,6 +285,31 @@ class Sidebar(QWidget):
         self.stats_button.clicked.connect(self.on_stats_clicked)
         main_layout.addWidget(self.stats_button)
 
+        # Dashboard button
+        self.dashboard_button = QPushButton("🗂️")
+        self.dashboard_button.setFixedSize(70, 45)
+        self.dashboard_button.setToolTip("Dashboard de Estructura")
+        self.dashboard_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.dashboard_button.setStyleSheet("""
+            QPushButton {
+                background-color: #252525;
+                color: #cccccc;
+                border: none;
+                border-top: 1px solid #1e1e1e;
+                font-size: 16pt;
+            }
+            QPushButton:hover {
+                background-color: #3d3d3d;
+                color: #007acc;
+            }
+            QPushButton:pressed {
+                background-color: #007acc;
+                color: #ffffff;
+            }
+        """)
+        self.dashboard_button.clicked.connect(self.on_dashboard_clicked)
+        main_layout.addWidget(self.dashboard_button)
+
         # Settings button at the bottom
         self.settings_button = QPushButton("⚙")
         self.settings_button.setFixedSize(70, 45)
@@ -425,3 +453,7 @@ class Sidebar(QWidget):
     def on_global_search_clicked(self):
         """Handle global search button click"""
         self.global_search_clicked.emit()
+
+    def on_dashboard_clicked(self):
+        """Handle dashboard button click"""
+        self.dashboard_clicked.emit()
