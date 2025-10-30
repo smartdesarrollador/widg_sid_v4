@@ -51,6 +51,7 @@ class MainWindow(QMainWindow):
         self.global_search_panel = None  # Ventana flotante para búsqueda global
         self.favorites_panel = None  # Ventana flotante para favoritos
         self.stats_panel = None  # Ventana flotante para estadísticas
+        self.structure_dashboard = None  # Dashboard de estructura (no-modal)
         self.category_filter_window = None  # Ventana de filtros de categorías
         self.current_category_id = None  # Para el toggle
         self.hotkey_manager = None
@@ -510,13 +511,19 @@ class MainWindow(QMainWindow):
 
             from views.dashboard.structure_dashboard import StructureDashboard
 
+            # Create dashboard as non-modal window
             dashboard = StructureDashboard(
                 db_manager=self.controller.config_manager.db,
                 parent=self
             )
-            dashboard.exec()  # Modal dialog
 
-            logger.info("Structure dashboard closed")
+            # Store reference to keep it alive
+            self.structure_dashboard = dashboard
+
+            # Show as non-modal (allows interaction with main sidebar)
+            dashboard.show()
+
+            logger.info("Structure dashboard opened (non-modal)")
 
         except Exception as e:
             logger.error(f"Error opening structure dashboard: {e}", exc_info=True)

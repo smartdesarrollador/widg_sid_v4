@@ -38,6 +38,12 @@ class StructureDashboard(QDialog):
         self.structure = None
         self.current_matches = []  # Store current search matches
         self.highlight_delegate = None  # Will be set in init_ui
+        self.is_custom_maximized = False  # Track custom maximize state
+
+        # For window dragging
+        self.dragging = False
+        self.drag_position = None
+        self.normal_geometry = None  # Store normal size for restore
 
         self.init_ui()
         self.setup_shortcuts()
@@ -46,8 +52,14 @@ class StructureDashboard(QDialog):
     def init_ui(self):
         """Initialize UI components"""
         self.setWindowTitle("Dashboard de Estructura - Widget Sidebar")
-        self.setModal(True)
+        self.setModal(False)  # Changed to non-modal so it doesn't block main window
         self.resize(1200, 800)
+
+        # Set window flags to stay behind the main sidebar
+        self.setWindowFlags(
+            Qt.WindowType.Window |  # Normal window
+            Qt.WindowType.CustomizeWindowHint  # Allow custom buttons
+        )
 
         # Center window on screen
         self.center_on_screen()
@@ -186,15 +198,29 @@ class StructureDashboard(QDialog):
         """)
 
         layout = QHBoxLayout(header)
-        layout.setContentsMargins(20, 10, 20, 10)
+        layout.setContentsMargins(20, 10, 10, 10)  # Reduced right margin
+        layout.setSpacing(8)  # Add spacing between elements
 
-        # Title
-        title = QLabel("📊 Dashboard de Estructura")
+        # Draggable title area
+        self.title_label = QLabel("📊 Dashboard de Estructura")
         title_font = QFont()
         title_font.setPointSize(14)
         title_font.setBold(True)
-        title.setFont(title_font)
-        layout.addWidget(title)
+        self.title_label.setFont(title_font)
+        self.title_label.setCursor(Qt.CursorShape.SizeAllCursor)  # Show move cursor
+        self.title_label.setStyleSheet("""
+            QLabel {
+                background-color: transparent;
+                padding: 5px;
+            }
+        """)
+
+        # Install event filter to capture mouse events on title
+        self.title_label.mousePressEvent = self.header_mouse_press
+        self.title_label.mouseMoveEvent = self.header_mouse_move
+        self.title_label.mouseReleaseEvent = self.header_mouse_release
+
+        layout.addWidget(self.title_label)
 
         layout.addStretch()
 
@@ -219,17 +245,63 @@ class StructureDashboard(QDialog):
         refresh_btn.clicked.connect(self.refresh_data)
         layout.addWidget(refresh_btn)
 
-        # Close button
-        close_btn = QPushButton("✖ Cerrar")
-        close_btn.setStyleSheet("""
+        # Add spacer before window controls
+        layout.addSpacing(20)
+
+        # Window control buttons - with better visibility
+        window_controls_style = """
             QPushButton {
-                background-color: #555555;
+                background-color: transparent;
+                color: #ffffff;
+                border: none;
+                font-size: 18pt;
+                font-weight: bold;
+                padding: 2px;
             }
             QPushButton:hover {
-                background-color: #666666;
+                background-color: #3d3d3d;
+                border-radius: 4px;
             }
             QPushButton:pressed {
-                background-color: #444444;
+                background-color: #2d2d2d;
+            }
+        """
+
+        # Minimize button
+        minimize_btn = QPushButton("─")
+        minimize_btn.setToolTip("Minimizar")
+        minimize_btn.setFixedSize(40, 35)
+        minimize_btn.setStyleSheet(window_controls_style)
+        minimize_btn.clicked.connect(self.showMinimized)
+        layout.addWidget(minimize_btn)
+
+        # Maximize/Restore button
+        self.maximize_btn = QPushButton("□")
+        self.maximize_btn.setToolTip("Maximizar")
+        self.maximize_btn.setFixedSize(40, 35)
+        self.maximize_btn.setStyleSheet(window_controls_style)
+        self.maximize_btn.clicked.connect(self.toggle_maximize)
+        layout.addWidget(self.maximize_btn)
+
+        # Close button - with red hover
+        close_btn = QPushButton("✕")
+        close_btn.setToolTip("Cerrar")
+        close_btn.setFixedSize(40, 35)
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #ffffff;
+                border: none;
+                font-size: 18pt;
+                font-weight: bold;
+                padding: 2px;
+            }
+            QPushButton:hover {
+                background-color: #e81123;
+                border-radius: 4px;
+            }
+            QPushButton:pressed {
+                background-color: #c50d1d;
             }
         """)
         close_btn.clicked.connect(self.close)
@@ -884,6 +956,78 @@ class StructureDashboard(QDialog):
         """)
         msg.exec()
         logger.info(f"Showed details for item {data.get('id')}")
+
+    def header_mouse_press(self, event):
+        """Handle mouse press on header for dragging"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.dragging = True
+            self.drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+
+    def header_mouse_move(self, event):
+        """Handle mouse move on header for dragging"""
+        if self.dragging and event.buttons() == Qt.MouseButton.LeftButton:
+            # If maximized, restore to normal size first
+            if self.is_custom_maximized:
+                self.is_custom_maximized = False
+                self.showNormal()
+                self.maximize_btn.setText("□")
+                self.maximize_btn.setToolTip("Maximizar")
+
+            # Move window
+            self.move(event.globalPosition().toPoint() - self.drag_position)
+            event.accept()
+
+    def header_mouse_release(self, event):
+        """Handle mouse release after dragging"""
+        self.dragging = False
+        event.accept()
+
+    def toggle_maximize(self):
+        """Toggle between maximized and normal window state"""
+        if self.is_custom_maximized:
+            # Restore to saved normal size
+            if self.normal_geometry:
+                self.setGeometry(self.normal_geometry)
+                logger.debug(f"Restored to saved geometry: {self.normal_geometry}")
+            else:
+                self.showNormal()
+                logger.debug("Restored to normal size (no saved geometry)")
+
+            self.is_custom_maximized = False
+            self.maximize_btn.setText("□")
+            self.maximize_btn.setToolTip("Maximizar")
+        else:
+            # Save current geometry before maximizing
+            self.normal_geometry = self.geometry()
+            logger.debug(f"Saved normal geometry: {self.normal_geometry}")
+
+            # Maximize window, but leave space for the main sidebar
+            screen = QApplication.primaryScreen()
+            if screen:
+                # Get screen geometry
+                screen_rect = screen.availableGeometry()
+
+                # Reserve space for sidebar (70px width + some margin)
+                sidebar_width = 85  # 70px sidebar + 15px margin
+
+                # Set geometry to cover screen except sidebar area (leave space on the right)
+                maximized_rect = screen_rect.adjusted(0, 0, -sidebar_width, 0)
+                self.setGeometry(maximized_rect)
+
+                # Set flag
+                self.is_custom_maximized = True
+
+                # Update button
+                self.maximize_btn.setText("❐")
+                self.maximize_btn.setToolTip("Restaurar")
+                logger.debug(f"Dashboard maximized with sidebar space: {maximized_rect}")
+            else:
+                # Fallback to normal maximize if screen not available
+                self.showMaximized()
+                self.maximize_btn.setText("❐")
+                self.maximize_btn.setToolTip("Restaurar")
+                logger.debug("Dashboard maximized (fallback)")
 
     def closeEvent(self, event):
         """Handle window close"""
