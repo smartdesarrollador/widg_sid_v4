@@ -361,6 +361,12 @@ class AdvancedFilterPanel(QWidget):
         self.no_tags_checkbox.stateChanged.connect(self.on_filter_changed)
         state_layout.addWidget(self.no_tags_checkbox)
 
+        # Checkbox: Solo Listas
+        self.lists_only_checkbox = QCheckBox("📝 Solo Listas")
+        self.lists_only_checkbox.setStyleSheet(self.get_checkbox_style())
+        self.lists_only_checkbox.stateChanged.connect(self.on_filter_changed)
+        state_layout.addWidget(self.lists_only_checkbox)
+
         self.content_layout.addLayout(state_layout)
 
     def create_usage_filter_section(self):
@@ -1286,6 +1292,9 @@ class AdvancedFilterPanel(QWidget):
         if self.no_tags_checkbox.isChecked():
             filters['has_tags'] = False
 
+        if self.lists_only_checkbox.isChecked():
+            filters['is_list'] = True
+
         logger.debug(f"Collected filters: {filters}")
 
         # Filtros de uso (Fase 3)
@@ -1390,6 +1399,7 @@ class AdvancedFilterPanel(QWidget):
         self.favorites_checkbox.setChecked(False)
         self.sensitive_checkbox.setChecked(False)
         self.no_tags_checkbox.setChecked(False)
+        self.lists_only_checkbox.setChecked(False)
 
         # Resetear widgets - Uso (Fase 3)
         self.use_count_operator.setCurrentIndex(0)  # "-"

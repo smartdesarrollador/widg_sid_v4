@@ -65,6 +65,9 @@ class AdvancedFilterEngine:
         if 'has_tags' in filters and filters['has_tags'] is not None:
             filtered = self._filter_by_has_tags(filtered, filters['has_tags'])
 
+        if 'is_list' in filters and filters['is_list'] is not None:
+            filtered = self._filter_by_is_list(filtered, filters['is_list'])
+
         if 'tags' in filters and filters['tags']:
             filtered = self._filter_by_tags(filtered, filters['tags'])
 
@@ -165,6 +168,22 @@ class AdvancedFilterEngine:
             return [item for item in items if item.tags and len(item.tags) > 0]
         else:
             return [item for item in items if not item.tags or len(item.tags) == 0]
+
+    def _filter_by_is_list(self, items: List[Item], is_list: bool) -> List[Item]:
+        """
+        Filtrar por items que son listas
+
+        Args:
+            items: Lista de items
+            is_list: True para solo listas, False para solo items normales
+
+        Returns:
+            Items filtrados
+        """
+        return [
+            item for item in items
+            if hasattr(item, 'is_list_item') and item.is_list_item() == is_list
+        ]
 
     def _filter_by_tags(self, items: List[Item], tag_filter: Dict[str, Any]) -> List[Item]:
         """

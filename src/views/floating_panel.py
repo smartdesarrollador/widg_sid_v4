@@ -567,7 +567,7 @@ class FloatingPanel(QWidget):
                 # Crear ListWidget
                 list_widget = ListWidget(
                     list_data=list_data,
-                    category_id=self.current_category.id if hasattr(self.current_category, 'id') else None,
+                    category_id=int(self.current_category.id) if hasattr(self.current_category, 'id') and self.current_category.id else None,
                     list_items=list_items
                 )
 
@@ -623,9 +623,17 @@ class FloatingPanel(QWidget):
     def on_list_edit_requested(self, list_group: str, category_id: int):
         """Handle list edit request from ListWidget"""
         logger.info(f"Edit requested for list '{list_group}' from category {category_id}")
+        logger.info(f"Current category: {self.current_category.name if self.current_category else 'None'}")
+        logger.info(f"Current category ID: {self.current_category.id if hasattr(self.current_category, 'id') else 'No ID attribute'}")
 
         if not self.list_controller:
-            logger.warning("No ListController available for editing")
+            logger.error("No ListController available for editing - Panel was created without controller")
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self,
+                "Error",
+                "ListController no disponible.\n\nPor favor reinicia la aplicación."
+            )
             return
 
         try:
@@ -687,7 +695,13 @@ class FloatingPanel(QWidget):
         logger.info(f"Copy all requested for list '{list_group}' from category {category_id}")
 
         if not self.list_controller:
-            logger.warning("No ListController available for copy operation")
+            logger.error("No ListController available for copy operation - Panel was created without controller")
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self,
+                "Error",
+                "ListController no disponible.\n\nPor favor reinicia la aplicación."
+            )
             return
 
         try:
@@ -730,7 +744,7 @@ class FloatingPanel(QWidget):
             creator_dialog = ListCreatorDialog(
                 list_controller=self.list_controller,
                 categories=categories,
-                selected_category_id=self.current_category.id if hasattr(self.current_category, 'id') else None,
+                selected_category_id=int(self.current_category.id) if hasattr(self.current_category, 'id') and self.current_category.id else None,
                 parent=self
             )
 
@@ -751,7 +765,7 @@ class FloatingPanel(QWidget):
 
         # Recargar la categoría para mostrar la nueva lista
         if self.current_category and hasattr(self.current_category, 'id'):
-            if self.current_category.id == category_id:
+            if int(self.current_category.id) == category_id:
                 # Recargar items y listas desde la base de datos
                 self.reload_current_category()
 
@@ -761,7 +775,7 @@ class FloatingPanel(QWidget):
 
         # Recargar la categoría para mostrar cambios
         if self.current_category and hasattr(self.current_category, 'id'):
-            if self.current_category.id == category_id:
+            if int(self.current_category.id) == category_id:
                 self.reload_current_category()
 
     def reload_current_category(self):
@@ -773,7 +787,7 @@ class FloatingPanel(QWidget):
         try:
             # Obtener items actualizados desde DB
             if hasattr(self.current_category, 'id'):
-                category_id = self.current_category.id
+                category_id = int(self.current_category.id)
 
                 # Obtener items desde config_manager
                 if hasattr(self.config_manager, 'db'):

@@ -259,11 +259,18 @@ class ListEditorDialog(QDialog):
         """Carga los datos de la lista existente"""
         try:
             # Obtener items de la lista
+            logger.info(f"[LIST_EDITOR] Loading list data:")
+            logger.info(f"   - category_id: {self.category_id}")
+            logger.info(f"   - list_group: '{self.original_list_group}'")
+
             items = self.list_controller.get_list_items(self.category_id, self.original_list_group)
+
+            logger.info(f"   - items returned: {len(items) if items else 0}")
 
             if not items:
                 logger.warning(f"[LIST_EDITOR] No items found for list: {self.original_list_group}")
-                QMessageBox.warning(self, "Advertencia", "No se encontraron items en esta lista")
+                logger.warning(f"[LIST_EDITOR] Query was: category_id={self.category_id}, list_group='{self.original_list_group}'")
+                QMessageBox.warning(self, "Advertencia", f"No se encontraron items en esta lista\n\nBuscando con category_id={self.category_id}")
                 return
 
             # Guardar conteo original
