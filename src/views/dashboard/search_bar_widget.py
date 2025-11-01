@@ -163,6 +163,7 @@ class SearchBarWidget(QWidget):
         scopes = [
             ('categories', 'Categorías'),
             ('items', 'Items'),
+            ('lists', 'Listas'),
             ('tags', 'Tags'),
             ('content', 'Contenido')
         ]

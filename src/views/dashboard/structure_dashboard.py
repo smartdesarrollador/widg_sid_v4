@@ -469,6 +469,8 @@ class StructureDashboard(QDialog):
 
                 # Column 0: Item name with indicators
                 indicators = ""
+                if item.get('is_list'):
+                    indicators += "📝 "
                 if item['is_favorite']:
                     indicators += "⭐ "
                 if item['is_sensitive']:
@@ -487,8 +489,12 @@ class StructureDashboard(QDialog):
                 type_icon = type_icons.get(item['type'], '📄')
                 item_widget.setText(1, f"{type_icon} {item['type']}")
 
-                # Column 2: Tags + preview
+                # Column 2: Tags + list_group + preview
                 info_parts = []
+
+                # List group (if is_list)
+                if item.get('is_list') and item.get('list_group'):
+                    info_parts.append(f"📝 Lista: {item['list_group']}")
 
                 # Tags
                 if item['tags']:
@@ -511,6 +517,9 @@ class StructureDashboard(QDialog):
 
                 if item['description']:
                     tooltip_parts.append(f"<b>Descripción:</b> {item['description']}")
+
+                if item.get('is_list') and item.get('list_group'):
+                    tooltip_parts.append(f"📝 <b>Pertenece a la lista:</b> {item['list_group']}")
 
                 if item['tags']:
                     tags_str = ", ".join([f"#{tag}" for tag in item['tags']])

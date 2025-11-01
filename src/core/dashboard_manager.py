@@ -93,7 +93,9 @@ class DashboardManager:
                         'tags': self._parse_tags(item.get('tags', '')),
                         'is_favorite': bool(item.get('is_favorite', 0)),
                         'is_sensitive': bool(item.get('is_sensitive', 0)),
-                        'description': item.get('description', '')
+                        'description': item.get('description', ''),
+                        'is_list': bool(item.get('is_list', 0)),
+                        'list_group': item.get('list_group', None)
                     }
                     category_data['items'].append(item_data)
 
@@ -363,6 +365,14 @@ class DashboardManager:
                         matches.append(('item', cat_idx, item_idx))
                         logger.debug(f"Item match: {item['label']}")
                         continue  # Skip other checks for this item
+
+                # Search in list_group (if is_list)
+                if scope_filters.get('lists', True):
+                    if item.get('is_list') and item.get('list_group'):
+                        if query_lower in item['list_group'].lower():
+                            matches.append(('list', cat_idx, item_idx))
+                            logger.debug(f"List match: {item['list_group']} - {item['label']}")
+                            continue
 
                 # Search in item tags
                 if scope_filters.get('tags', True):
