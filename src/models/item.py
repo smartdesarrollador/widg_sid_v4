@@ -31,7 +31,11 @@ class Item:
         working_dir: Optional[str] = None,
         color: Optional[str] = None,
         is_active: bool = True,
-        is_archived: bool = False
+        is_archived: bool = False,
+        # Nuevos campos para listas avanzadas
+        is_list: bool = False,
+        list_group: Optional[str] = None,
+        orden_lista: int = 0
     ):
         self.id = item_id
         self.label = label
@@ -46,6 +50,10 @@ class Item:
         self.color = color  # Color para identificación visual
         self.is_active = is_active  # Si el item está activo (puede usarse)
         self.is_archived = is_archived  # Si el item está archivado (oculto por defecto)
+        # Campos de listas avanzadas
+        self.is_list = is_list  # Indica si este item es parte de una lista
+        self.list_group = list_group  # Nombre/identificador del grupo de lista
+        self.orden_lista = orden_lista  # Posición del item dentro de la lista
         self.created_at = datetime.now()
         self.last_used = datetime.now()
 
@@ -78,7 +86,11 @@ class Item:
             "working_dir": self.working_dir,
             "color": self.color,
             "is_active": self.is_active,
-            "is_archived": self.is_archived
+            "is_archived": self.is_archived,
+            # Campos de listas avanzadas
+            "is_list": self.is_list,
+            "list_group": self.list_group,
+            "orden_lista": self.orden_lista
         }
 
     @classmethod
@@ -103,7 +115,11 @@ class Item:
             working_dir=data.get("working_dir"),
             color=data.get("color"),
             is_active=data.get("is_active", True),
-            is_archived=data.get("is_archived", False)
+            is_archived=data.get("is_archived", False),
+            # Campos de listas avanzadas
+            is_list=data.get("is_list", False),
+            list_group=data.get("list_group"),
+            orden_lista=data.get("orden_lista", 0)
         )
 
     # Estado y visibilidad
@@ -131,8 +147,40 @@ class Item:
         """Desactivar el item (no puede ser usado)"""
         self.is_active = False
 
+    # Métodos para listas avanzadas
+    def is_list_item(self) -> bool:
+        """Retorna True si este item es parte de una lista"""
+        return self.is_list == True or self.is_list == 1
+
+    def get_list_group(self) -> Optional[str]:
+        """Retorna el nombre del grupo de lista al que pertenece este item (o None)"""
+        return self.list_group if self.is_list_item() else None
+
+    def get_orden_lista(self) -> int:
+        """Retorna la posición de este item dentro de su lista"""
+        return self.orden_lista if self.is_list_item() else 0
+
+    def set_as_list_item(self, list_group: str, orden: int) -> None:
+        """
+        Configura este item como parte de una lista
+
+        Args:
+            list_group: Nombre/identificador del grupo de lista
+            orden: Posición del item dentro de la lista (1, 2, 3...)
+        """
+        self.is_list = True
+        self.list_group = list_group
+        self.orden_lista = orden
+
+    def remove_from_list(self) -> None:
+        """Remueve este item de cualquier lista (lo convierte en item normal)"""
+        self.is_list = False
+        self.list_group = None
+        self.orden_lista = 0
+
     def __repr__(self) -> str:
-        return f"Item(id={self.id}, label={self.label}, type={self.type.value})"
+        list_info = f", list={self.list_group}[{self.orden_lista}]" if self.is_list_item() else ""
+        return f"Item(id={self.id}, label={self.label}, type={self.type.value}{list_info})"
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, Item):

@@ -131,10 +131,22 @@ class DBManager:
                 icon TEXT,
                 is_sensitive BOOLEAN DEFAULT 0,
                 is_favorite BOOLEAN DEFAULT 0,
+                favorite_order INTEGER DEFAULT 0,
+                use_count INTEGER DEFAULT 0,
                 tags TEXT,
+                description TEXT,
+                working_dir TEXT,
+                color TEXT,
+                badge TEXT,
+                is_active BOOLEAN DEFAULT 1,
+                is_archived BOOLEAN DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_used TIMESTAMP,
+                -- Campos de listas avanzadas
+                is_list BOOLEAN DEFAULT 0,
+                list_group TEXT DEFAULT NULL,
+                orden_lista INTEGER DEFAULT 0,
                 FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
             );
 
@@ -173,6 +185,10 @@ class DBManager:
             CREATE INDEX IF NOT EXISTS idx_pinned_category ON pinned_panels(category_id);
             CREATE INDEX IF NOT EXISTS idx_pinned_last_opened ON pinned_panels(last_opened DESC);
             CREATE INDEX IF NOT EXISTS idx_pinned_active ON pinned_panels(is_active);
+            -- Índices para listas avanzadas
+            CREATE INDEX IF NOT EXISTS idx_items_is_list ON items(is_list) WHERE is_list = 1;
+            CREATE INDEX IF NOT EXISTS idx_items_list_group ON items(list_group) WHERE list_group IS NOT NULL;
+            CREATE INDEX IF NOT EXISTS idx_items_orden_lista ON items(category_id, list_group, orden_lista) WHERE is_list = 1;
 
             -- Configuración inicial por defecto
             INSERT OR IGNORE INTO settings (key, value) VALUES
@@ -531,7 +547,9 @@ class DBManager:
                  is_sensitive: bool = False, is_favorite: bool = False,
                  tags: List[str] = None, description: str = None,
                  working_dir: str = None, color: str = None,
-                 is_active: bool = True, is_archived: bool = False) -> int:
+                 is_active: bool = True, is_archived: bool = False,
+                 is_list: bool = False, list_group: str = None,
+                 orden_lista: int = 0) -> int:
         """
         Add new item to category
 
@@ -549,6 +567,9 @@ class DBManager:
             color: Item color for visual identification (optional)
             is_active: Whether item is active (default True)
             is_archived: Whether item is archived (default False)
+            is_list: Whether item is part of a list (default False)
+            list_group: Name/identifier of the list group (optional)
+            orden_lista: Position of item within the list (default 0)
 
         Returns:
             int: New item ID
@@ -563,14 +584,15 @@ class DBManager:
         tags_json = json.dumps(tags or [])
         query = """
             INSERT INTO items
-            (category_id, label, content, type, icon, is_sensitive, is_favorite, tags, description, working_dir, color, is_active, is_archived, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            (category_id, label, content, type, icon, is_sensitive, is_favorite, tags, description, working_dir, color, is_active, is_archived, is_list, list_group, orden_lista, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         """
         item_id = self.execute_update(
             query,
-            (category_id, label, content, item_type, icon, is_sensitive, is_favorite, tags_json, description, working_dir, color, is_active, is_archived)
+            (category_id, label, content, item_type, icon, is_sensitive, is_favorite, tags_json, description, working_dir, color, is_active, is_archived, is_list, list_group, orden_lista)
         )
-        logger.info(f"Item added: {label} (ID: {item_id}, Sensitive: {is_sensitive}, Favorite: {is_favorite}, Active: {is_active}, Archived: {is_archived})")
+        list_info = f", List: {list_group}[{orden_lista}]" if is_list else ""
+        logger.info(f"Item added: {label} (ID: {item_id}, Sensitive: {is_sensitive}, Favorite: {is_favorite}, Active: {is_active}, Archived: {is_archived}{list_info})")
         return item_id
 
     def update_item(self, item_id: int, **kwargs) -> None:
@@ -579,9 +601,9 @@ class DBManager:
 
         Args:
             item_id: Item ID to update
-            **kwargs: Fields to update (label, content, type, icon, is_sensitive, is_favorite, tags, description, working_dir, is_active, is_archived)
+            **kwargs: Fields to update (label, content, type, icon, is_sensitive, is_favorite, tags, description, working_dir, is_active, is_archived, is_list, list_group, orden_lista)
         """
-        allowed_fields = ['label', 'content', 'type', 'icon', 'is_sensitive', 'is_favorite', 'tags', 'description', 'working_dir', 'color', 'is_active', 'is_archived']
+        allowed_fields = ['label', 'content', 'type', 'icon', 'is_sensitive', 'is_favorite', 'tags', 'description', 'working_dir', 'color', 'is_active', 'is_archived', 'is_list', 'list_group', 'orden_lista']
         updates = []
         params = []
 
@@ -737,6 +759,340 @@ class DBManager:
                 item['tags'] = []
 
         return results
+
+    # ========== LISTAS AVANZADAS ==========
+
+    def create_list(self, category_id: int, list_name: str, items_data: List[Dict[str, Any]]) -> List[int]:
+        """
+        Crea una lista completa con múltiples items
+
+        Args:
+            category_id: ID de la categoría
+            list_name: Nombre de la lista (list_group)
+            items_data: Lista de dicts con datos de cada paso
+                [
+                    {'label': 'Paso 1', 'content': '...', 'type': 'TEXT'},
+                    {'label': 'Paso 2', 'content': '...', 'type': 'CODE'},
+                ]
+
+        Returns:
+            List[int]: Lista de IDs de los items creados
+        """
+        if not items_data or len(items_data) < 1:
+            raise ValueError("La lista debe tener al menos 1 item")
+
+        # Validar que el nombre de lista sea único
+        if not self.is_list_name_unique(category_id, list_name):
+            raise ValueError(f"El nombre de lista '{list_name}' ya existe en esta categoría")
+
+        item_ids = []
+
+        try:
+            with self.transaction() as conn:
+                for orden, item_data in enumerate(items_data, start=1):
+                    # Agregar item con campos de lista
+                    item_id = self.add_item(
+                        category_id=category_id,
+                        label=item_data.get('label', f'Paso {orden}'),
+                        content=item_data.get('content', ''),
+                        item_type=item_data.get('type', 'TEXT'),
+                        icon=item_data.get('icon'),
+                        is_sensitive=item_data.get('is_sensitive', False),
+                        tags=item_data.get('tags'),
+                        description=item_data.get('description'),
+                        working_dir=item_data.get('working_dir'),
+                        color=item_data.get('color'),
+                        # Campos de lista
+                        is_list=True,
+                        list_group=list_name,
+                        orden_lista=orden
+                    )
+                    item_ids.append(item_id)
+
+                logger.info(f"Lista creada: '{list_name}' con {len(item_ids)} items en categoría {category_id}")
+
+            return item_ids
+
+        except Exception as e:
+            logger.error(f"Error al crear lista '{list_name}': {e}")
+            raise
+
+    def get_lists_by_category(self, category_id: int) -> List[Dict[str, Any]]:
+        """
+        Obtiene resumen de todas las listas en una categoría
+
+        Args:
+            category_id: ID de la categoría
+
+        Returns:
+            List[Dict]: Lista de diccionarios con info de cada lista
+                [
+                    {
+                        'list_group': 'Deploy Producción',
+                        'item_count': 5,
+                        'first_label': 'Pull cambios',
+                        'created_at': '2025-10-31 10:00:00'
+                    },
+                    ...
+                ]
+        """
+        query = """
+            SELECT
+                list_group,
+                COUNT(*) as item_count,
+                MIN(label) as first_label,
+                MIN(created_at) as created_at,
+                MAX(last_used) as last_used
+            FROM items
+            WHERE category_id = ?
+            AND is_list = 1
+            AND is_active = 1
+            GROUP BY list_group
+            ORDER BY created_at DESC
+        """
+        results = self.execute_query(query, (category_id,))
+        logger.debug(f"Encontradas {len(results)} listas en categoría {category_id}")
+        return results
+
+    def get_list_items(self, category_id: int, list_group: str) -> List[Dict[str, Any]]:
+        """
+        Obtiene todos los items de una lista específica, ordenados por orden_lista
+
+        Args:
+            category_id: ID de la categoría
+            list_group: Nombre de la lista
+
+        Returns:
+            List[Dict]: Lista de items ordenados (con contenido desencriptado si es sensible)
+        """
+        query = """
+            SELECT * FROM items
+            WHERE category_id = ?
+            AND is_list = 1
+            AND list_group = ?
+            AND is_active = 1
+            ORDER BY orden_lista ASC
+        """
+        results = self.execute_query(query, (category_id, list_group))
+
+        # Desencriptar y parsear tags (mismo proceso que en get_items_by_category)
+        from core.encryption_manager import EncryptionManager
+        encryption_manager = EncryptionManager()
+
+        for item in results:
+            # Parse tags
+            if item['tags']:
+                try:
+                    item['tags'] = json.loads(item['tags'])
+                except json.JSONDecodeError:
+                    if isinstance(item['tags'], str):
+                        item['tags'] = [tag.strip() for tag in item['tags'].split(',') if tag.strip()]
+                    else:
+                        item['tags'] = []
+            else:
+                item['tags'] = []
+
+            # Decrypt sensitive content
+            if item.get('is_sensitive') and item.get('content'):
+                try:
+                    item['content'] = encryption_manager.decrypt(item['content'])
+                    logger.debug(f"Content decrypted for item ID: {item['id']}")
+                except Exception as e:
+                    logger.error(f"Failed to decrypt item {item['id']}: {e}")
+                    item['content'] = "[DECRYPTION ERROR]"
+
+        logger.debug(f"Obtenidos {len(results)} items de lista '{list_group}'")
+        return results
+
+    def reorder_list_item(self, item_id: int, new_orden: int) -> bool:
+        """
+        Cambia el orden de un item dentro de su lista
+        También reordena los demás items afectados
+
+        Args:
+            item_id: ID del item a reordenar
+            new_orden: Nueva posición (1, 2, 3...)
+
+        Returns:
+            bool: True si se reordenó exitosamente
+        """
+        # Obtener info del item
+        item = self.get_item(item_id)
+        if not item or not item.get('is_list'):
+            logger.warning(f"Item {item_id} no encontrado o no es parte de una lista")
+            return False
+
+        category_id = item['category_id']
+        list_group = item['list_group']
+        old_orden = item['orden_lista']
+
+        if old_orden == new_orden:
+            logger.debug(f"Item {item_id} ya está en la posición {new_orden}")
+            return True
+
+        try:
+            with self.transaction() as conn:
+                cursor = conn.cursor()
+
+                # Si movemos hacia arriba (new_orden < old_orden)
+                # Incrementar orden de los items entre new_orden y old_orden
+                if new_orden < old_orden:
+                    cursor.execute("""
+                        UPDATE items
+                        SET orden_lista = orden_lista + 1
+                        WHERE category_id = ?
+                        AND list_group = ?
+                        AND orden_lista >= ?
+                        AND orden_lista < ?
+                    """, (category_id, list_group, new_orden, old_orden))
+
+                # Si movemos hacia abajo (new_orden > old_orden)
+                # Decrementar orden de los items entre old_orden y new_orden
+                else:
+                    cursor.execute("""
+                        UPDATE items
+                        SET orden_lista = orden_lista - 1
+                        WHERE category_id = ?
+                        AND list_group = ?
+                        AND orden_lista > ?
+                        AND orden_lista <= ?
+                    """, (category_id, list_group, old_orden, new_orden))
+
+                # Actualizar el item movido
+                cursor.execute("""
+                    UPDATE items
+                    SET orden_lista = ?
+                    WHERE id = ?
+                """, (new_orden, item_id))
+
+                logger.info(f"Item {item_id} reordenado de posición {old_orden} a {new_orden} en lista '{list_group}'")
+                return True
+
+        except Exception as e:
+            logger.error(f"Error al reordenar item {item_id}: {e}")
+            return False
+
+    def delete_list(self, category_id: int, list_group: str) -> bool:
+        """
+        Elimina TODOS los items de una lista
+
+        Args:
+            category_id: ID de la categoría
+            list_group: Nombre de la lista a eliminar
+
+        Returns:
+            bool: True si se eliminó exitosamente
+        """
+        try:
+            query = """
+                DELETE FROM items
+                WHERE category_id = ?
+                AND list_group = ?
+                AND is_list = 1
+            """
+            with self.transaction() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, (category_id, list_group))
+                deleted_count = cursor.rowcount
+
+                logger.info(f"Lista '{list_group}' eliminada ({deleted_count} items) de categoría {category_id}")
+                return True
+
+        except Exception as e:
+            logger.error(f"Error al eliminar lista '{list_group}': {e}")
+            return False
+
+    def update_list(self, category_id: int, old_list_group: str,
+                   new_list_group: str = None, items_data: List[Dict[str, Any]] = None) -> bool:
+        """
+        Actualiza una lista existente
+
+        Permite:
+        - Renombrar la lista (cambiar list_group)
+        - Actualizar los items de la lista (agregar/eliminar/modificar pasos)
+
+        Args:
+            category_id: ID de la categoría
+            old_list_group: Nombre actual de la lista
+            new_list_group: Nuevo nombre (opcional, si se quiere renombrar)
+            items_data: Nuevos datos de items (opcional, si se quiere actualizar contenido)
+
+        Returns:
+            bool: True si se actualizó exitosamente
+        """
+        try:
+            with self.transaction() as conn:
+                # Caso 1: Solo renombrar
+                if new_list_group and new_list_group != old_list_group:
+                    # Validar que el nuevo nombre sea único
+                    if not self.is_list_name_unique(category_id, new_list_group, exclude_list=old_list_group):
+                        raise ValueError(f"El nombre '{new_list_group}' ya existe en esta categoría")
+
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        UPDATE items
+                        SET list_group = ?
+                        WHERE category_id = ?
+                        AND list_group = ?
+                        AND is_list = 1
+                    """, (new_list_group, category_id, old_list_group))
+
+                    logger.info(f"Lista renombrada: '{old_list_group}' → '{new_list_group}'")
+
+                # Caso 2: Actualizar items de la lista
+                if items_data is not None:
+                    # Eliminar items actuales
+                    final_list_name = new_list_group if new_list_group else old_list_group
+                    self.delete_list(category_id, final_list_name)
+
+                    # Crear nuevos items
+                    self.create_list(category_id, final_list_name, items_data)
+
+                    logger.info(f"Lista '{final_list_name}' actualizada con {len(items_data)} items")
+
+                return True
+
+        except Exception as e:
+            logger.error(f"Error al actualizar lista '{old_list_group}': {e}")
+            return False
+
+    def is_list_name_unique(self, category_id: int, list_name: str, exclude_list: str = None) -> bool:
+        """
+        Verifica si el nombre de lista es único en la categoría
+
+        Args:
+            category_id: ID de la categoría
+            list_name: Nombre de lista a verificar
+            exclude_list: Nombre de lista a excluir (útil para edición)
+
+        Returns:
+            bool: True si el nombre es único, False si ya existe
+        """
+        if exclude_list:
+            query = """
+                SELECT COUNT(*) as count
+                FROM items
+                WHERE category_id = ?
+                AND list_group = ?
+                AND is_list = 1
+                AND list_group != ?
+            """
+            result = self.execute_query(query, (category_id, list_name, exclude_list))
+        else:
+            query = """
+                SELECT COUNT(*) as count
+                FROM items
+                WHERE category_id = ?
+                AND list_group = ?
+                AND is_list = 1
+            """
+            result = self.execute_query(query, (category_id, list_name))
+
+        count = result[0]['count'] if result else 0
+        is_unique = count == 0
+
+        logger.debug(f"Nombre de lista '{list_name}' en categoría {category_id}: {'único' if is_unique else 'ya existe'}")
+        return is_unique
 
     # ========== CLIPBOARD HISTORY ==========
 

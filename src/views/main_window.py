@@ -222,7 +222,10 @@ class MainWindow(QMainWindow):
 
                     # Create floating panel if it doesn't exist or current one is pinned
                     if not self.floating_panel:
-                        self.floating_panel = FloatingPanel(config_manager=self.config_manager)
+                        self.floating_panel = FloatingPanel(
+                            config_manager=self.config_manager,
+                            list_controller=self.controller.list_controller if self.controller else None
+                        )
                         self.floating_panel.item_clicked.connect(self.on_item_clicked)
                         self.floating_panel.window_closed.connect(self.on_floating_panel_closed)
                         self.floating_panel.pin_state_changed.connect(self.on_panel_pin_changed)
@@ -1181,6 +1184,7 @@ class MainWindow(QMainWindow):
                     # Create new floating panel with saved configuration
                     restored_panel = FloatingPanel(
                         config_manager=self.config_manager,
+                        list_controller=self.controller.list_controller if self.controller else None,
                         panel_id=panel_id,
                         custom_name=panel_data.get('custom_name'),
                         custom_color=panel_data.get('custom_color')
@@ -1278,6 +1282,7 @@ class MainWindow(QMainWindow):
         # Create new floating panel with saved configuration
         restored_panel = FloatingPanel(
             config_manager=self.config_manager,
+            list_controller=self.controller.list_controller if self.controller else None,
             panel_id=panel_id,
             custom_name=panel_data.get('custom_name'),
             custom_color=panel_data.get('custom_color')

@@ -12,8 +12,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from models.category import Category
 from models.item import Item
 from views.widgets.item_widget import ItemButton
+from views.widgets.list_widget import ListWidget
 from views.widgets.search_bar import SearchBar
 from views.advanced_filters_window import AdvancedFiltersWindow
+from views.dialogs.list_creator_dialog import ListCreatorDialog
+from views.dialogs.list_editor_dialog import ListEditorDialog
 from core.search_engine import SearchEngine
 from core.advanced_filter_engine import AdvancedFilterEngine
 
@@ -36,13 +39,15 @@ class FloatingPanel(QWidget):
     # Signal emitted when customization is requested
     customization_requested = pyqtSignal()
 
-    def __init__(self, config_manager=None, panel_id=None, custom_name=None, custom_color=None, parent=None):
+    def __init__(self, config_manager=None, list_controller=None, panel_id=None, custom_name=None, custom_color=None, parent=None):
         super().__init__(parent)
         self.current_category = None
         self.config_manager = config_manager
+        self.list_controller = list_controller  # Controlador de listas
         self.search_engine = SearchEngine()
         self.filter_engine = AdvancedFilterEngine()  # Motor de filtrado avanzado
         self.all_items = []  # Store all items before filtering
+        self.all_lists = []  # Store all lists before filtering
         self.current_filters = {}  # Filtros activos actuales
         self.current_state_filter = "normal"  # Filtro de estado actual: normal, archived, inactive, all
         self.is_pinned = False  # Estado de anclaje del panel
@@ -345,6 +350,38 @@ class FloatingPanel(QWidget):
         self.state_filter_combo.currentIndexChanged.connect(self.on_state_filter_changed)
         filters_button_layout.addWidget(self.state_filter_combo)
 
+        # Agregar stretch para empujar el botón Nueva Lista a la derecha
+        filters_button_layout.addStretch()
+
+        # Botón Nueva Lista
+        self.new_list_button = QPushButton("📝 Nueva Lista")
+        self.new_list_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.new_list_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2a5a2a;
+                color: #ffffff;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-size: 10pt;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #3a7a3a;
+            }
+            QPushButton:pressed {
+                background-color: #1a4a1a;
+            }
+            QPushButton:disabled {
+                background-color: #2a2a2a;
+                color: #666666;
+            }
+        """)
+        self.new_list_button.setToolTip("Crear una nueva lista de pasos secuenciales")
+        self.new_list_button.clicked.connect(self.on_new_list_clicked)
+        self.new_list_button.setEnabled(False)  # Disabled hasta que se cargue una categoría
+        filters_button_layout.addWidget(self.new_list_button)
+
         main_layout.addWidget(self.filters_button_widget)
 
         # Crear ventana flotante de filtros (oculta inicialmente)
@@ -395,11 +432,22 @@ class FloatingPanel(QWidget):
         main_layout.addWidget(self.scroll_area)
 
     def load_category(self, category: Category):
-        """Load and display items from a category"""
+        """Load and display items and lists from a category"""
         logger.info(f"Loading category: {category.name} with {len(category.items)} items")
 
         self.current_category = category
-        self.all_items = category.items.copy()
+
+        # Separar items normales de items de listas
+        self.all_items = [item for item in category.items if not item.is_list_item()]
+
+        # Obtener listas si tenemos ListController
+        self.all_lists = []
+        if self.list_controller and hasattr(category, 'id'):
+            try:
+                self.all_lists = self.list_controller.get_lists(category.id)
+                logger.info(f"Loaded {len(self.all_lists)} lists from category {category.name}")
+            except Exception as e:
+                logger.error(f"Error loading lists: {e}", exc_info=True)
 
         # Update header
         self.header_label.setText(category.name)
@@ -414,10 +462,16 @@ class FloatingPanel(QWidget):
 
         # Clear existing items
         self.clear_items()
-        logger.debug("Previous items cleared")
+        logger.debug("Previous items and lists cleared")
 
-        # Add new items
-        self.display_items(self.all_items)
+        # Display items and lists
+        self.display_items_and_lists(self.all_items, self.all_lists)
+
+        # Enable "Nueva Lista" button if we have a list controller
+        if self.list_controller and hasattr(category, 'id'):
+            self.new_list_button.setEnabled(True)
+        else:
+            self.new_list_button.setEnabled(False)
 
         # Show the window
         self.show()
@@ -425,7 +479,7 @@ class FloatingPanel(QWidget):
         self.activateWindow()
 
     def display_items(self, items):
-        """Display a list of items"""
+        """Display a list of items (mantiene compatibilidad hacia atrás)"""
         logger.info(f"Displaying {len(items)} items")
 
         # Clear existing items
@@ -440,6 +494,94 @@ class FloatingPanel(QWidget):
 
         logger.info(f"Successfully added {len(items)} item buttons to layout")
 
+    def display_items_and_lists(self, items, lists):
+        """Display items and lists in separate sections
+
+        Args:
+            items: List of Item objects (solo items normales, no items de listas)
+            lists: List of list metadata dicts from ListController.get_lists()
+        """
+        logger.info(f"Displaying {len(items)} items and {len(lists)} lists")
+
+        # Clear existing content
+        self.clear_items()
+
+        # === SECCIÓN DE ITEMS ===
+        if items:
+            # Section header
+            items_header = QLabel(f"━━━ Items ({len(items)}) ━━━")
+            items_header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            items_header.setStyleSheet("""
+                QLabel {
+                    color: #888888;
+                    font-size: 10pt;
+                    font-weight: bold;
+                    padding: 8px;
+                    background-color: transparent;
+                }
+            """)
+            self.items_layout.insertWidget(self.items_layout.count() - 1, items_header)
+
+            # Add items
+            for idx, item in enumerate(items):
+                logger.debug(f"Creating item button {idx+1}/{len(items)}: {item.label}")
+                item_button = ItemButton(item)
+                item_button.item_clicked.connect(self.on_item_clicked)
+                self.items_layout.insertWidget(self.items_layout.count() - 1, item_button)
+
+        # === SECCIÓN DE LISTAS ===
+        if lists:
+            # Spacer entre secciones
+            if items:
+                spacer_label = QLabel("")
+                spacer_label.setFixedHeight(10)
+                spacer_label.setStyleSheet("background-color: transparent;")
+                self.items_layout.insertWidget(self.items_layout.count() - 1, spacer_label)
+
+            # Section header
+            lists_header = QLabel(f"━━━ Listas ({len(lists)}) ━━━")
+            lists_header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lists_header.setStyleSheet("""
+                QLabel {
+                    color: #888888;
+                    font-size: 10pt;
+                    font-weight: bold;
+                    padding: 8px;
+                    background-color: transparent;
+                }
+            """)
+            self.items_layout.insertWidget(self.items_layout.count() - 1, lists_header)
+
+            # Add lists
+            for idx, list_data in enumerate(lists):
+                logger.debug(f"Creating list widget {idx+1}/{len(lists)}: {list_data.get('list_group')}")
+
+                # Obtener items de la lista
+                list_items = []
+                if self.list_controller and hasattr(self.current_category, 'id'):
+                    list_items = self.list_controller.get_list_items(
+                        self.current_category.id,
+                        list_data.get('list_group')
+                    )
+
+                # Crear ListWidget
+                list_widget = ListWidget(
+                    list_data=list_data,
+                    category_id=self.current_category.id if hasattr(self.current_category, 'id') else None,
+                    list_items=list_items
+                )
+
+                # Conectar señales
+                list_widget.list_executed.connect(self.on_list_executed)
+                list_widget.list_edited.connect(self.on_list_edit_requested)
+                list_widget.list_deleted.connect(self.on_list_delete_requested)
+                list_widget.copy_all_requested.connect(self.on_list_copy_all_requested)
+                list_widget.item_copied.connect(self.on_list_item_copied)
+
+                self.items_layout.insertWidget(self.items_layout.count() - 1, list_widget)
+
+        logger.info(f"Successfully displayed {len(items)} items and {len(lists)} lists")
+
     def clear_items(self):
         """Clear all item buttons"""
         while self.items_layout.count() > 1:  # Keep the stretch at the end
@@ -452,20 +594,227 @@ class FloatingPanel(QWidget):
         # Emit signal to parent
         self.item_clicked.emit(item)
 
+    # ========== LIST WIDGET HANDLERS ==========
+
+    def on_list_executed(self, list_group: str, category_id: int):
+        """Handle list execution request from ListWidget"""
+        logger.info(f"Executing list '{list_group}' from category {category_id}")
+
+        if not self.list_controller:
+            logger.warning("No ListController available for execution")
+            return
+
+        try:
+            # Ejecutar lista secuencialmente con delay de 500ms
+            success = self.list_controller.execute_list_sequentially(
+                category_id=category_id,
+                list_group=list_group,
+                delay_ms=500
+            )
+
+            if success:
+                logger.info(f"List '{list_group}' execution started successfully")
+            else:
+                logger.warning(f"Failed to start list '{list_group}' execution")
+
+        except Exception as e:
+            logger.error(f"Error executing list '{list_group}': {e}", exc_info=True)
+
+    def on_list_edit_requested(self, list_group: str, category_id: int):
+        """Handle list edit request from ListWidget"""
+        logger.info(f"Edit requested for list '{list_group}' from category {category_id}")
+
+        if not self.list_controller:
+            logger.warning("No ListController available for editing")
+            return
+
+        try:
+            # Obtener categorías para el editor
+            categories = []
+            if self.config_manager:
+                categories = self.config_manager.get_categories()
+                logger.info(f"Loaded {len(categories)} categories for editor dialog")
+
+            # Crear y mostrar dialog de edición
+            editor_dialog = ListEditorDialog(
+                list_controller=self.list_controller,
+                categories=categories,
+                category_id=category_id,
+                list_group=list_group,
+                parent=self
+            )
+
+            # Conectar señal de lista actualizada
+            editor_dialog.list_updated.connect(self.on_list_updated_from_dialog)
+
+            # Mostrar dialog
+            result = editor_dialog.exec()
+
+            logger.info(f"List editor dialog closed with result: {result}")
+
+        except Exception as e:
+            logger.error(f"Error opening list editor: {e}", exc_info=True)
+
+    def on_list_delete_requested(self, list_group: str, category_id: int):
+        """Handle list deletion request from ListWidget"""
+        logger.info(f"Delete requested for list '{list_group}' from category {category_id}")
+
+        if not self.list_controller:
+            logger.warning("No ListController available for deletion")
+            return
+
+        try:
+            # Eliminar la lista
+            success, message = self.list_controller.delete_list(category_id, list_group)
+
+            if success:
+                logger.info(f"List '{list_group}' deleted successfully")
+
+                # Recargar categoría para reflejar cambios
+                if self.current_category:
+                    # Necesitamos actualizar la categoría desde la base de datos
+                    # Por ahora solo recargamos la vista
+                    self.all_lists = self.list_controller.get_lists(category_id)
+                    self.display_items_and_lists(self.all_items, self.all_lists)
+            else:
+                logger.warning(f"Failed to delete list '{list_group}': {message}")
+
+        except Exception as e:
+            logger.error(f"Error deleting list '{list_group}': {e}", exc_info=True)
+
+    def on_list_copy_all_requested(self, list_group: str, category_id: int):
+        """Handle copy all request from ListWidget"""
+        logger.info(f"Copy all requested for list '{list_group}' from category {category_id}")
+
+        if not self.list_controller:
+            logger.warning("No ListController available for copy operation")
+            return
+
+        try:
+            # Copiar todo el contenido de la lista
+            success, message = self.list_controller.copy_all_list_items(
+                category_id=category_id,
+                list_group=list_group,
+                separator='\n'
+            )
+
+            if success:
+                logger.info(f"All items from list '{list_group}' copied to clipboard")
+            else:
+                logger.warning(f"Failed to copy list '{list_group}': {message}")
+
+        except Exception as e:
+            logger.error(f"Error copying list '{list_group}': {e}", exc_info=True)
+
+    def on_list_item_copied(self, content: str):
+        """Handle individual list item copy"""
+        logger.info(f"List item copied: {content[:50]}...")
+        # El contenido ya fue copiado por el ListWidget, solo loguear
+
+    def on_new_list_clicked(self):
+        """Handle click on 'Nueva Lista' button"""
+        logger.info("New list button clicked")
+
+        if not self.current_category or not self.list_controller:
+            logger.warning("Cannot create list: no category or list controller")
+            return
+
+        try:
+            # Obtener categorías desde config_manager
+            categories = []
+            if self.config_manager:
+                categories = self.config_manager.get_categories()
+                logger.info(f"Loaded {len(categories)} categories for dialog")
+
+            # Crear y mostrar dialog de creación
+            creator_dialog = ListCreatorDialog(
+                list_controller=self.list_controller,
+                categories=categories,
+                selected_category_id=self.current_category.id if hasattr(self.current_category, 'id') else None,
+                parent=self
+            )
+
+            # Conectar señal de lista creada
+            creator_dialog.list_created.connect(self.on_list_created_from_dialog)
+
+            # Mostrar dialog
+            result = creator_dialog.exec()
+
+            logger.info(f"List creator dialog closed with result: {result}")
+
+        except Exception as e:
+            logger.error(f"Error opening list creator: {e}", exc_info=True)
+
+    def on_list_created_from_dialog(self, list_name: str, category_id: int, item_ids: list):
+        """Handle list creation from ListCreatorDialog"""
+        logger.info(f"List '{list_name}' created successfully in category {category_id} with {len(item_ids)} items")
+
+        # Recargar la categoría para mostrar la nueva lista
+        if self.current_category and hasattr(self.current_category, 'id'):
+            if self.current_category.id == category_id:
+                # Recargar items y listas desde la base de datos
+                self.reload_current_category()
+
+    def on_list_updated_from_dialog(self, list_name: str, category_id: int):
+        """Handle list update from ListEditorDialog"""
+        logger.info(f"List '{list_name}' updated successfully in category {category_id}")
+
+        # Recargar la categoría para mostrar cambios
+        if self.current_category and hasattr(self.current_category, 'id'):
+            if self.current_category.id == category_id:
+                self.reload_current_category()
+
+    def reload_current_category(self):
+        """Reload current category from database"""
+        if not self.current_category or not self.config_manager:
+            logger.warning("Cannot reload: no current category or config manager")
+            return
+
+        try:
+            # Obtener items actualizados desde DB
+            if hasattr(self.current_category, 'id'):
+                category_id = self.current_category.id
+
+                # Obtener items desde config_manager
+                if hasattr(self.config_manager, 'db'):
+                    all_items_from_db = self.config_manager.db.get_items_by_category(category_id)
+
+                    # Actualizar items en la categoría
+                    from models.item import Item
+                    self.current_category.items = [Item.from_dict(item_dict) for item_dict in all_items_from_db]
+
+                    # Separar items normales
+                    self.all_items = [item for item in self.current_category.items if not item.is_list_item()]
+
+                    # Recargar listas
+                    if self.list_controller:
+                        self.all_lists = self.list_controller.get_lists(category_id)
+
+                    # Re-renderizar
+                    self.display_items_and_lists(self.all_items, self.all_lists)
+
+                    logger.info(f"Category reloaded successfully: {len(self.all_items)} items, {len(self.all_lists)} lists")
+
+        except Exception as e:
+            logger.error(f"Error reloading category: {e}", exc_info=True)
+
     def on_search_changed(self, query: str):
         """Handle search query change with filtering"""
         if not self.current_category:
             return
 
-        # Aplicar filtros avanzados primero
+        # Aplicar filtros avanzados primero a items
         filtered_items = self.filter_engine.apply_filters(self.all_items, self.current_filters)
 
         # Aplicar filtro de estado (is_active, is_archived)
         filtered_items = self.filter_items_by_state(filtered_items)
 
+        # Filtrar listas (por ahora solo por nombre)
+        filtered_lists = self.all_lists.copy()
+
         # Luego aplicar búsqueda si hay query
         if query and query.strip():
-            # Crear categoría temporal con items filtrados para búsqueda
+            # Buscar en items
             from models.category import Category
             temp_category = Category(
                 category_id="temp",
@@ -476,7 +825,14 @@ class FloatingPanel(QWidget):
             temp_category.items = filtered_items
             filtered_items = self.search_engine.search_in_category(query, temp_category)
 
-        self.display_items(filtered_items)
+            # Buscar en nombres de listas
+            query_lower = query.lower()
+            filtered_lists = [
+                list_data for list_data in filtered_lists
+                if query_lower in list_data.get('list_group', '').lower()
+            ]
+
+        self.display_items_and_lists(filtered_items, filtered_lists)
 
     def on_filters_changed(self, filters: dict):
         """Handle cuando cambian los filtros avanzados"""

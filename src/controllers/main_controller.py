@@ -11,6 +11,7 @@ from core.clipboard_manager import ClipboardManager
 from core.category_filter_engine import CategoryFilterEngine
 from core.pinned_panels_manager import PinnedPanelsManager
 from controllers.clipboard_controller import ClipboardController
+from controllers.list_controller import ListController
 from models.category import Category
 from models.item import Item
 import logging
@@ -30,6 +31,7 @@ class MainController:
 
         # Initialize controllers
         self.clipboard_controller = ClipboardController(self.clipboard_manager)
+        self.list_controller = ListController(self.config_manager.db, self.clipboard_manager)
 
         # Data
         self.categories: List[Category] = []  # All categories (unfiltered, for compatibility)
